@@ -283,7 +283,8 @@ async function toItems(list) {
 
 // Un GIF importé de Miro était souvent une vidéo X / Instagram / Pinterest convertie : on reprend la vidéo d'origine.
 async function upgradeGif(it) {
-  if (!it.preferOriginal || it.blob?.type !== 'image/gif' || !POST_RE.test(it.source || '') || !hasExtension()) return [it];
+  if (!it.preferOriginal || !POST_RE.test(it.source || '') || !hasExtension()) return [it];
+  if ((await mimeOf(it.blob, it.name)) !== 'image/gif') return [it];
   try {
     const { items } = await fetchViaExtension([it.source]);
     return items.length ? items : [it];

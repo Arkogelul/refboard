@@ -14,16 +14,29 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function mimeOf(blob, name = '') {
+async function mimeOf(blob, name = '') {
   const type = (blob.type || '').split(';')[0];
   if (MEDIA_TYPES[type]) return type;
   const ext = name.split(/[?#]/)[0].split('.').pop().toLowerCase();
-  return EXT_TYPES[ext] || null;
+  return EXT_TYPES[ext] || sniff(new Uint8Array(await blob.slice(0, 16).arrayBuffer()));
+}
+
+// Reconnaît le format d'après les premiers octets du fichier (Miro, par exemple, n'indique ni type ni extension).
+function sniff(b) {
+  const at = (i, ...bytes) => bytes.every((v, k) => b[i + k] === v);
+  const text = (i, s) => at(i, ...[...s].map((c) => c.charCodeAt(0)));
+  if (at(0, 0xff, 0xd8, 0xff)) return 'image/jpeg';
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return 'image/png';
+  if (text(0, 'GIF8')) return 'image/gif';
+  if (text(0, 'RIFF') && text(8, 'WEBP')) return 'image/webp';
+  if (text(4, 'ftyp')) return 'video/mp4';
+  if (at(0, 0x1a, 0x45, 0xdf, 0xa3)) return 'video/webm';
+  return null;
 }
 
 // Renvoie un nouvel élément de planche (pas encore placé).
 async function importMedia(blob, { name = '', source = '' } = {}) {
-  const mime = mimeOf(blob, name);
+  const mime = await mimeOf(blob, name);
   if (!mime) throw new Error(`Format non pris en charge : ${name || blob.type || 'inconnu'}`);
   if (blob.type !== mime) blob = new Blob([blob], { type: mime });
   const type = MEDIA_TYPES[mime];

@@ -67,7 +67,7 @@
     // Ouvre RefBoard dans un nouvel onglet et attend qu'il soit prêt.
     function openRefBoard() {
       return new Promise((ok, ko) => {
-        const win = window.open(REFBOARD, '_blank');
+        const win = window.open(`${REFBOARD}&t=${Date.now()}`, '_blank'); // adresse unique : jamais une vieille version en cache
         if (!win) return ko(new Error('Le navigateur a bloqué l’ouverture de RefBoard : autorise les fenêtres pour miro.com'));
         const timer = setTimeout(() => ko(new Error('RefBoard ne répond pas')), 60000);
         addEventListener('message', function ready(e) {
