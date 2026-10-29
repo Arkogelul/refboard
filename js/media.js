@@ -38,6 +38,16 @@ async function importMedia(blob, { name = '', source = '' } = {}) {
   };
 }
 
+// Carte YouTube : pas de fichier, juste l'identifiant de la vidéo (vignette et lecteur viennent de YouTube).
+const YT_RE = /(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/;
+
+function youtubeItem(youtubeId, { short = false, source = '' } = {}) {
+  return {
+    id: uid(), type: 'youtube', youtubeId, nw: short ? 9 : 16, nh: short ? 16 : 9, x: 0, y: 0, w: 16, h: 9,
+    source: source || `https://www.youtube.com/watch?v=${youtubeId}`, name: '', added: new Date().toISOString(), fileId: null,
+  };
+}
+
 // Télécharge un média depuis une URL (glisser-déposer depuis une autre page, collage d'un lien).
 async function importUrl(url) {
   let r;

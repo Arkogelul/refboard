@@ -148,10 +148,21 @@ async function importFiles(files, at) {
   else toast(`${items.length} média${items.length > 1 ? 's' : ''} ajouté${items.length > 1 ? 's' : ''}`);
 }
 
-const POST_RE = /(?:x|twitter)\.com\/[^/]+\/status\/|instagram\.com\/(?:[^/]+\/)?(?:p|reels?|tv)\//;
+// Posts de réseaux sociaux : seule l'extension « Vers RefBoard » sait en extraire les médias.
+const POST_RE = /(?:x|twitter)\.com\/[^/]+\/status\/|instagram\.com\/(?:[^/]+\/)?(?:p|reels?|tv)\/|pinterest\.[a-z.]+\/pin\/|^https?:\/\/pin\.it\//;
 
 async function importFromUrl(url, at) {
-  if (POST_RE.test(url)) return toast("Pour un post X ou Instagram, passe par l'extension.", 'error');
+  const yt = url.match(YT_RE);
+  if (yt) {
+    Board.addItems([youtubeItem(yt[1], { short: /\/shorts\//.test(url), source: url })], at);
+    return toast('Vidéo YouTube ajoutée : double-clic pour la lire');
+  }
+  if (POST_RE.test(url)) {
+    if (!document.documentElement.dataset.refboardExtension)
+      return toast("Pour un post X, Instagram ou Pinterest, installe l'extension « Vers RefBoard » (voir extension/INSTALLER.md).", 'error');
+    window.postMessage({ refboard: 'fetch', urls: [url] }, location.origin);
+    return toast('Récupération du post par l’extension…', 'info', true);
+  }
   toast('Téléchargement…', 'info', true);
   try {
     Board.addItems([await importUrl(url)], at);
@@ -202,6 +213,41 @@ $('fileInput').onchange = (e) => {
   importFiles(e.target.files, Board.dropPoint());
   e.target.value = '';
 };
+
+// ---------- Extension « Vers RefBoard » ----------
+// Elle dépose ses médias dans cette page via window.postMessage (voir extension/refboard-bridge.js).
+
+let appReady = false;
+
+addEventListener('message', async (e) => {
+  if (e.source !== window || !e.data?.refboard) return;
+  const msg = e.data;
+  if (msg.refboard === 'hello' && appReady) window.postMessage({ refboard: 'ready' }, location.origin);
+  if (msg.refboard === 'fetched') toast(msg.message);
+  if (msg.refboard === 'error') toast(msg.message || "L'extension n'a pas pu récupérer ce post", 'error');
+  if (msg.refboard === 'add') {
+    let ok = true;
+    let error;
+    try {
+      await receiveFromExtension(msg.items);
+    } catch (err) {
+      ok = false;
+      error = err.message;
+    }
+    window.postMessage({ refboard: 'added', id: msg.id, ok, error }, location.origin);
+  }
+});
+
+async function receiveFromExtension(list) {
+  const items = [];
+  for (const it of list) {
+    if (it.kind === 'youtube') items.push(youtubeItem(it.id, { short: it.short, source: it.source }));
+    else items.push(await importMedia(it.blob, { name: it.name, source: it.source }));
+  }
+  Board.addItems(items, Board.dropPoint());
+  Sync.uploadPending();
+  toast(`${items.length} média${items.length > 1 ? 's' : ''} reçu${items.length > 1 ? 's' : ''} de l'extension`);
+}
 
 // ---------- Barre d'outils et réglages ----------
 
@@ -349,6 +395,8 @@ addEventListener('keydown', (e) => {
     await openBoard(localStorage.getItem('refboard.board'));
     cleanupOrphans();
     Sync.start();
+    appReady = true;
+    window.postMessage({ refboard: 'ready' }, location.origin);
   } catch (e) {
     toast(`Stockage local indisponible : ${e.message}`, 'error', true);
   }

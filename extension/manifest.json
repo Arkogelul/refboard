@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Vers RefBoard",
+  "version": "2.0.0",
+  "description": "Envoie les images et vidéos de X, Instagram, Pinterest, YouTube et du web vers ta planche RefBoard, avec leur lien d'origine.",
+  "permissions": ["contextMenus", "storage", "scripting", "tabs", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Vers RefBoard" },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["shared.js", "x.js"],
+      "css": ["button.css"]
+    },
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["shared.js", "instagram.js"],
+      "css": ["button.css"]
+    },
+    {
+      "matches": ["https://*.pinterest.com/*", "https://*.pinterest.fr/*", "https://*.pinterest.ca/*", "https://*.pinterest.co.uk/*", "https://*.pinterest.de/*"],
+      "js": ["shared.js", "pinterest.js"],
+      "css": ["button.css"]
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["shared.js", "youtube.js"],
+      "css": ["button.css"]
+    },
+    {
+      "matches": ["https://arkogelul.github.io/refboard/*", "http://localhost:8791/*"],
+      "js": ["refboard-bridge.js"]
+    }
+  ]
+}

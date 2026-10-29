@@ -54,7 +54,9 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 #world.animate .item { transition: transform .4s ease, width .4s ease, height .4s ease; }
 
 .item { position: absolute; left: 0; top: 0; background: #1c1c21; user-select: none; }
-.item .media { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.item .media { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; border: 0; }
+.item[data-type="youtube"] .media { object-fit: cover; }
+.item.playing .media { pointer-events: auto; } /* les commandes du lecteur YouTube restent cliquables */
 .item.selected { outline: calc(2px * var(--inv)) solid var(--accent); }
 
 /* Outils et badges : contre-zoomés pour garder la même taille à l'écran */

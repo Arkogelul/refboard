@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 320px; margin: 0; padding: 14px; font: 13px system-ui, sans-serif; color: #e6e6e9; background: #18181b; }
+    h1 { font-size: 15px; margin: 0 0 8px; }
+    #board { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; background: #232845; }
+    #board.none { background: #3a2a1a; }
+    textarea { width: 100%; box-sizing: border-box; height: 90px; font: 12px monospace; color: inherit; background: #232328; border: 1px solid #2f2f36; border-radius: 6px; }
+    button { width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 6px; background: #4c6ef5; color: #fff; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    label { display: block; margin-top: 10px; }
+    #status { margin-top: 8px; min-height: 1em; }
+    .err { color: #ef5b5f; }
+    .hint { color: #8d8d96; font-size: 12px; margin-top: 10px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>Vers RefBoard</h1>
+  <div id="board">…</div>
+  <textarea id="urls" placeholder="Colle un ou plusieurs liens (un par ligne) : posts X, Instagram, Pinterest, vidéos YouTube, ou n'importe quelle page"></textarea>
+  <button id="send">Envoyer vers RefBoard</button>
+  <div id="status"></div>
+  <label><input type="checkbox" id="focus"> Basculer sur RefBoard après l'envoi</label>
+  <p class="hint">Sur X, Instagram, Pinterest et YouTube : clique sur la petite icône ⬆ ajoutée aux posts.
+    Partout ailleurs : clic droit sur une image, une vidéo ou un lien → « Envoyer vers RefBoard ».</p>
+  <script src="popup.js"></script>
+</body>
+</html>

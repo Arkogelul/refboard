@@ -246,7 +246,9 @@ const Sync = (() => {
     try {
       for (;;) {
         fillIds();
-        const todo = boards.flatMap((b) => b.items).filter((it) => !it.fileId && !skipped.has(it.id));
+        const todo = boards
+          .flatMap((b) => b.items)
+          .filter((it) => it.type !== 'youtube' && !it.fileId && !skipped.has(it.id)); // YouTube : rien à envoyer, juste le lien
         if (!todo.length) break;
         const it = todo[0];
         setState('on', `Envoi vers Drive… (${todo.length})`);

@@ -16,6 +16,7 @@ const Board = (() => {
   const shown = new Map(); // id -> { level: 'thumb' | 'full' } (affiché ou en cours de chargement)
   const selected = new Set();
   const audible = new Set(); // vidéos dont le son a été activé
+  const playing = new Set(); // cartes YouTube dont le lecteur est lancé
   const undoStack = [];
   const redoStack = [];
   let board = null;
@@ -129,6 +130,8 @@ const Board = (() => {
 
   // ---------- Éléments ----------
 
+  const BADGES = { gif: 'GIF', video: 'VIDÉO', youtube: 'YOUTUBE' };
+
   function makeEl(it) {
     const el = document.createElement('div');
     el.className = 'item';
@@ -137,9 +140,10 @@ const Board = (() => {
     el.innerHTML =
       '<div class="tools">' +
       (it.type === 'video' ? '<button data-act="sound" title="Activer / couper le son">🔇</button>' : '') +
+      (it.type === 'youtube' ? '<button data-act="play" title="Lire / arrêter la vidéo">▶</button>' : '') +
       '<button data-act="source" title="Ouvrir la source">↗</button>' +
       '</div>' +
-      (it.type === 'image' ? '' : `<div class="badge"><span>${it.type === 'gif' ? 'GIF' : 'VIDÉO'}</span></div>`);
+      (it.type === 'image' ? '' : `<div class="badge"><span>${BADGES[it.type]}</span></div>`);
     placeEl(el, it);
     return el;
   }
@@ -206,10 +210,12 @@ const Board = (() => {
       const px = Math.max(it.w, it.h) * view.s; // taille à l'écran
       els.get(it.id).classList.toggle('tiny', px < 90);
       if (!intersects(near, it)) {
+        if (playing.has(it.id)) stop(it.id); // une vidéo YouTube sortie de l'écran s'arrête
         if (shown.has(it.id) && !intersects(far, it)) unloadMedia(it.id);
         continue;
       }
-      const want = it.type === 'image' ? (px * dpr > THUMB_SIZE * 1.2 ? 'full' : 'thumb') : px > 150 ? 'full' : 'thumb';
+      let want = it.type === 'image' ? (px * dpr > THUMB_SIZE * 1.2 ? 'full' : 'thumb') : px > 150 ? 'full' : 'thumb';
+      if (it.type === 'youtube') want = playing.has(it.id) ? 'player' : 'cover';
       if (shown.get(it.id)?.level !== want) loadMedia(it, want);
     }
   }
@@ -217,6 +223,7 @@ const Board = (() => {
   async function loadMedia(it, level) {
     const entry = { level };
     shown.set(it.id, entry);
+    if (it.type === 'youtube') return showYouTube(it, level, entry);
     // Absent de ce PC (ajouté depuis un autre) : on le récupère sur Google Drive.
     const blob = (await DB.getBlob(level === 'full' ? 'media' : 'thumbs', it.id)) || (await Sync.fetchBlob(it, level));
     if (shown.get(it.id) !== entry || !blob) return;
@@ -245,11 +252,48 @@ const Board = (() => {
     el._url = url;
   }
 
+  // Carte YouTube : la vignette publique de la vidéo, ou le lecteur intégré quand on la lance.
+  async function showYouTube(it, level, entry) {
+    let node;
+    if (level === 'player') {
+      node = document.createElement('iframe');
+      node.src = `https://www.youtube-nocookie.com/embed/${it.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${it.youtubeId}&rel=0&playsinline=1`;
+      node.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      node.allowFullscreen = true;
+    } else {
+      node = new Image();
+      node.draggable = false;
+      node.referrerPolicy = 'no-referrer';
+      node.src = `https://i.ytimg.com/vi/${it.youtubeId}/hqdefault.jpg`;
+      await node.decode().catch(() => {});
+    }
+    const el = els.get(it.id);
+    if (shown.get(it.id) !== entry || !el) return;
+    node.className = 'media';
+    const old = el.querySelector('.media');
+    if (old) old.replaceWith(node);
+    else el.prepend(node);
+    el.classList.toggle('playing', level === 'player');
+    const btn = el.querySelector('[data-act="play"]');
+    if (btn) btn.textContent = level === 'player' ? '■' : '▶';
+  }
+
+  function play(id) {
+    playing.add(id);
+    scheduleMedia();
+  }
+
+  function stop(id) {
+    playing.delete(id);
+    scheduleMedia();
+  }
+
   function unloadMedia(id) {
     shown.delete(id);
     const el = els.get(id);
     if (!el) return;
     el.querySelector('.media')?.remove();
+    el.classList.remove('playing');
     if (el._url) URL.revokeObjectURL(el._url);
     el._url = null;
   }
@@ -431,12 +475,16 @@ const Board = (() => {
       if (video) video.muted = !audible.has(id);
       btn.textContent = audible.has(id) ? '🔊' : '🔇';
     }
+    if (btn.dataset.act === 'play') (playing.has(id) ? stop : play)(id);
   });
 
   // Double-clic sur un média : il remplit l'écran.
   stage.addEventListener('dblclick', (e) => {
     const el = e.target.closest('.item');
-    if (el && !e.target.closest('.tools')) zoomToRect(byId(el.dataset.id), 30, MAX_ZOOM);
+    if (!el || e.target.closest('.tools')) return;
+    const it = byId(el.dataset.id);
+    zoomToRect(it, 30, MAX_ZOOM);
+    if (it.type === 'youtube') play(it.id);
   });
 
   // Espace maintenu : déplacement de la vue à la souris.

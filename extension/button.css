@@ -1,0 +1,47 @@
+/* Icône discrète : grise comme les icônes d'action, bleu RefBoard au survol. */
+.refboard-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(113, 118, 123);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, opacity 0.15s;
+}
+.refboard-btn svg { width: 18px; height: 18px; }
+.refboard-btn:hover { color: #4c6ef5; background: rgba(76, 110, 245, 0.1); }
+.refboard-btn.busy { color: #4c6ef5; cursor: wait; }
+.refboard-btn.busy svg { animation: refboard-pulse 0.9s ease-in-out infinite; }
+.refboard-btn.done { color: #00ba7c; }
+.refboard-btn.failed { color: #d93025; }
+@keyframes refboard-pulse { 50% { opacity: 0.3; } }
+
+/* Instagram, Pinterest : icône posée sur la carte, invisible tant que la souris n'est pas dessus. */
+.refboard-in-card,
+.refboard-page {
+  position: absolute;
+  z-index: 10;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #262626;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.refboard-in-card { top: 12px; right: 56px; opacity: 0; }
+[data-grid-item] > .refboard-in-card { top: 8px; left: 8px; right: auto; }
+article:hover > .refboard-in-card,
+[data-grid-item]:hover > .refboard-in-card,
+.refboard-in-card.busy,
+.refboard-in-card.done,
+.refboard-in-card.failed { opacity: 1; }
+.refboard-page { position: fixed; top: 14px; right: 14px; z-index: 2147483646; opacity: 0.6; }
+.refboard-page:hover, .refboard-page.busy { opacity: 1; }
+.refboard-in-card:hover, .refboard-page:hover { background: #fff; color: #4c6ef5; }
+/* YouTube : sous la barre du haut */
+ytd-app ~ #refboard-page-btn { top: 70px; }
