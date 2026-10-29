@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RefBoard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="logo">RefBoard</span>
+    <select id="boardSelect" title="Changer de planche"></select>
+    <button id="boardNew" class="icon" title="Nouvelle planche">＋</button>
+    <button id="boardMenuBtn" class="icon" title="Renommer ou supprimer la planche">⋯</button>
+    <span class="sep"></span>
+    <button id="addBtn" title="Ajouter des fichiers (ou glisse-les, ou colle-les avec Ctrl+V)">Ajouter…</button>
+    <input type="file" id="fileInput" multiple hidden
+      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm">
+    <span class="sep"></span>
+    <button id="arrangeBtn" class="primary">Tout ranger</button>
+    <button id="uniformBtn">Taille uniforme</button>
+    <button id="settingsBtn" class="icon" title="Réglages du rangement">⚙</button>
+    <span class="grow"></span>
+    <span id="status"></span>
+    <button id="driveBtn" data-state="off">Se connecter à Drive</button>
+  </header>
+
+  <main id="stage">
+    <div id="world"></div>
+    <div id="overlay">
+      <div id="selBox" hidden>
+        <div class="handle" data-corner="nw"></div>
+        <div class="handle" data-corner="ne"></div>
+        <div class="handle" data-corner="sw"></div>
+        <div class="handle" data-corner="se"></div>
+      </div>
+      <div id="rubber" hidden></div>
+    </div>
+    <div id="empty" hidden>
+      <div>
+        <p>Glisse des images, des GIF ou des vidéos ici,<br>ou colle-les avec <kbd>Ctrl</kbd>+<kbd>V</kbd>.</p>
+        <p class="hint">Molette : zoom · Pavé tactile : deux doigts pour se déplacer, pincer pour zoomer<br>
+          Espace + glisser ou clic molette : se déplacer · Double-clic : plein écran sur un média</p>
+      </div>
+    </div>
+  </main>
+
+  <div id="zoomBar">
+    <button id="zoomOut" title="Dézoomer (Ctrl −)">−</button>
+    <button id="zoomLabel" title="Revenir à 100 % (Ctrl 0)">100 %</button>
+    <button id="zoomIn" title="Zoomer (Ctrl +)">+</button>
+    <button id="zoomFit" title="Tout voir (Shift 1)">⤢</button>
+  </div>
+  <div id="info"></div>
+
+  <form id="settingsPanel" class="panel" hidden onsubmit="return false">
+    <h3>Rangement</h3>
+    <label>Disposition
+      <select name="mode">
+        <option value="rows">Lignes justifiées</option>
+        <option value="grid">Grille</option>
+      </select>
+    </label>
+    <label><span data-for="rows">Hauteur des lignes</span><span data-for="grid">Taille des cases</span>
+      <span><input name="rowHeight" type="number" min="20" step="10"> px</span></label>
+    <label>Espacement <span><input name="gap" type="number" min="0" step="2"> px</span></label>
+    <label data-for="rows">Largeur totale <span><input name="width" type="number" min="100" step="100" placeholder="auto"> px</span></label>
+    <label data-for="grid">Colonnes <span><input name="cols" type="number" min="1" placeholder="auto"></span></label>
+    <label>Ordre
+      <select name="order">
+        <option value="position">Position actuelle</option>
+        <option value="added">Date d'ajout</option>
+        <option value="type">Vidéos, GIF, puis images</option>
+      </select>
+    </label>
+    <button type="button" id="panelArrange" class="primary">Ranger</button>
+
+    <h3>Taille uniforme</h3>
+    <label>
+      <select name="uniformDim">
+        <option value="h">Même hauteur</option>
+        <option value="w">Même largeur</option>
+      </select>
+      <span><input name="uniformSize" type="number" min="20" step="10"> px</span>
+    </label>
+    <button type="button" id="panelUniform">Appliquer</button>
+
+    <h3>Navigation</h3>
+    <label>Molette
+      <select name="wheel">
+        <option value="auto">Détection auto (comme Miro)</option>
+        <option value="zoom">Zoome toujours</option>
+        <option value="pan">Fait défiler</option>
+      </select>
+    </label>
+  </form>
+
+  <div id="menu" class="menu" hidden></div>
+  <div id="toast"></div>
+
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/media.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
