@@ -118,14 +118,20 @@ async function deleteBoard() {
   cleanupOrphans();
 }
 
-// Supprime les fichiers qui ne sont plus utilisés par aucune planche.
+// Supprime du cache local les fichiers qui ne sont plus utilisés par aucune planche,
+// et recense la taille des autres (pour le plafond du cache).
 async function cleanupOrphans() {
   const used = new Set(boards.flatMap((b) => b.items.map((it) => it.id)));
   for (const id of await DB.keys('media')) {
-    if (used.has(id)) continue;
+    if (used.has(id)) {
+      if (!MediaCache.known(id)) MediaCache.touch(id, (await DB.getBlob('media', id))?.size || 0);
+      continue;
+    }
     await DB.deleteBlob('media', id);
     await DB.deleteBlob('thumbs', id);
+    MediaCache.forget(id);
   }
+  MediaCache.trim(Sync.isUploaded);
 }
 
 // ---------- Import ----------
@@ -344,7 +350,10 @@ stage.addEventListener('contextmenu', (e) => {
         if (url !== null) Board.setSource(it.id, url.trim());
       },
     });
-    entries.push({ label: 'Ouvrir le fichier (taille réelle, son)', run: () => openFile(it) });
+    if (it.type !== 'youtube') {
+      entries.push({ label: 'Ouvrir le fichier (taille réelle, son)', run: () => openFile(it) });
+      entries.push({ label: 'Télécharger le fichier', run: () => downloadFile(it) });
+    }
     entries.push('-');
   }
   entries.push({ label: 'Mettre au premier plan', run: Board.bringToFront });
@@ -354,9 +363,70 @@ stage.addEventListener('contextmenu', (e) => {
   openMenu(e.clientX, e.clientY, entries);
 });
 
+// Original d'un média : depuis le cache local, sinon depuis Google Drive.
+async function originalOf(it) {
+  return (await DB.getBlob('media', it.id)) || (await Sync.fetchBlob(it, 'full'));
+}
+
 async function openFile(it) {
-  const blob = await DB.getBlob('media', it.id);
+  const blob = await originalOf(it);
   if (blob) window.open(URL.createObjectURL(blob), '_blank');
+  else toast('Fichier introuvable : connecte-toi à Drive pour le récupérer', 'error');
+}
+
+const extOf = (it, blob) => Object.keys(EXT_TYPES).find((e) => EXT_TYPES[e] === (blob?.type || it.mime)) || 'bin';
+const safeName = (s) => s.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'planche';
+
+async function downloadFile(it) {
+  const blob = await originalOf(it);
+  if (!blob) return toast('Fichier introuvable : connecte-toi à Drive pour le récupérer', 'error');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeName(it.name.split(/[\\/]/).pop().replace(/\.[^.]*$/, '')) || it.id}.${extOf(it, blob)}`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+
+// Tout exporter : un sous-dossier par planche, avec ses fichiers, liens.txt (sources, vidéos YouTube) et planche.json.
+async function exportAll() {
+  if (!window.showDirectoryPicker) return toast("L'export demande Chrome ou Edge sur ordinateur", 'error');
+  let root;
+  try {
+    root = await showDirectoryPicker({ mode: 'readwrite' });
+  } catch {
+    return; // fenêtre annulée
+  }
+  const write = async (dir, name, data) => {
+    const w = await (await dir.getFileHandle(name, { create: true })).createWritable();
+    await w.write(data);
+    await w.close();
+  };
+  const total = boards.reduce((n, b) => n + b.items.length, 0);
+  let done = 0;
+  let missing = 0;
+  for (const b of boards) {
+    const dir = await root.getDirectoryHandle(safeName(b.name), { create: true });
+    const links = [];
+    for (const [i, it] of b.items.entries()) {
+      toast(`Export ${++done} / ${total}…`, 'info', true);
+      const num = String(i + 1).padStart(3, '0');
+      if (it.type === 'youtube') {
+        links.push(`${num}  YouTube  ${it.source}`);
+        continue;
+      }
+      const blob = await originalOf(it);
+      if (!blob) {
+        missing++;
+        continue;
+      }
+      const file = `${num}.${extOf(it, blob)}`;
+      await write(dir, file, blob);
+      if (it.source) links.push(`${file}  ${it.source}`);
+    }
+    await write(dir, 'liens.txt', links.join('\r\n'));
+    await write(dir, 'planche.json', JSON.stringify({ ...b, view: undefined }, null, 2));
+  }
+  toast(missing ? `Export terminé, ${missing} média(s) introuvable(s) (connecte-toi à Drive)` : `Export terminé : ${total} média(s)`, missing ? 'error' : 'ok');
 }
 
 // ---------- Raccourcis clavier ----------

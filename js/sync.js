@@ -1,12 +1,16 @@
-// Synchronisation avec Google Drive.
-// Sur le Drive : un dossier « RefBoard » avec board.json (toutes les planches), media/ (originaux) et thumbs/ (vignettes).
+// Synchronisation avec Google Drive, dans l'espace privé de l'app (jamais recopié sur ton PC) :
+//   board.json (toutes les planches), media-<id>.<ext> (originaux), thumb-<id>.webp (vignettes).
 // IndexedDB reste le cache local : on n'envoie que ce qui est nouveau, on ne télécharge que ce qui est affiché.
 
 const Sync = (() => {
+  const SPACE = 'appDataFolder';
+  const KEEP_ORPHANS = 30 * 86_400_000; // un média retiré des planches reste 30 jours sur le Drive (filet de sécurité)
+
   let state = 'off'; // off | connecting | on | auth | error
   let detail = ''; // texte du bouton pendant un envoi
-  let folders = readJSON('refboard.folders'); // { root, media, thumbs, board }
-  const meta = { remoteVersion: null, deleted: [], ...readJSON('refboard.sync') }; // version de board.json déjà fusionnée, planches supprimées
+  let boardFile = null; // id de board.json dans l'espace privé
+  // version de board.json déjà fusionnée, planches supprimées, fichiers orphelins (id -> date où on l'a remarqué)
+  const meta = { remoteVersion: null, deleted: [], orphans: {}, ...readJSON('refboard.sync') };
   const uploaded = readJSON('refboard.uploaded'); // id du média -> [fileId, thumbId], survit aux annulations
   let dirty = false; // des changements locaux restent à envoyer
   let pushTimer;
@@ -15,6 +19,7 @@ const Sync = (() => {
 
   const saveMeta = () => remember('refboard.sync', meta);
   const isOn = () => state === 'on';
+  const allItems = () => boards.flatMap((b) => b.items);
 
   // ---------- État et bouton ----------
 
@@ -28,15 +33,17 @@ const Sync = (() => {
     b.title =
       {
         off: 'Enregistrer les planches et les médias sur ton Google Drive',
-        on: 'Planches enregistrées sur Google Drive',
+        on: 'Planches enregistrées sur Google Drive (espace privé de RefBoard)',
         auth: 'La session Google a expiré : clique pour te reconnecter',
         error: 'Clique pour réessayer',
       }[s] || '';
   }
 
   function fail(e) {
-    if (e instanceof Drive.AuthNeeded) setState('auth');
-    else {
+    if (e instanceof Drive.AuthNeeded) {
+      setState('auth');
+      if (e.message.startsWith('Coche')) toast(e.message, 'error');
+    } else {
       setState('error');
       toast(e.message, 'error');
       console.error(e);
@@ -50,10 +57,13 @@ const Sync = (() => {
     setState('connecting');
     try {
       if (interactive || !Drive.hasToken()) await Drive.signIn();
-      await setupFolders();
+      const found = (await Drive.list(`name='board.json' and trashed=false`, 'id'))[0]?.id || null;
+      if (found !== boardFile) meta.remoteVersion = null;
+      boardFile = found;
       remember('refboard.drive', '1');
       setState('on');
       await pull(true);
+      await migrateLegacy();
       dirty = true; // envoie aussi les planches qui n'existaient qu'ici
       await push();
       Board.refreshMedia();
@@ -80,37 +90,52 @@ const Sync = (() => {
     toast('Déconnecté de Google Drive. Les planches restent disponibles sur ce PC.');
   }
 
-  async function setupFolders() {
-    if (folders.root) {
-      const alive = await Drive.get(folders.root, 'id,trashed').then(
-        (f) => !f.trashed,
-        (e) => {
-          if (e instanceof Drive.AuthNeeded) throw e;
-          return false;
-        }
-      );
-      if (alive) return;
+  // Versions précédentes : un dossier visible « RefBoard » dans Mon Drive (recopié sur le PC).
+  // On reprend ses planches, on renvoie ses médias dans l'espace privé, puis on le met à la corbeille.
+  async function migrateLegacy() {
+    const legacy = await Drive.legacyFolders();
+    if (!legacy.length) return;
+    setState('on', 'Déplacement vers l’espace privé…');
+    const inSpace = new Set((await Drive.list('trashed=false', 'id')).map((f) => f.id));
+    for (const folder of legacy) {
+      const json = (await Drive.list(`name='board.json' and '${folder.id}' in parents and trashed=false`, 'id', 'drive'))[0];
+      if (json) merge(JSON.parse(await (await Drive.download(json.id)).text()));
     }
-    const root = await Drive.findOrCreateFolder('RefBoard', 'root');
-    folders = {
-      root,
-      media: await Drive.findOrCreateFolder('media', root),
-      thumbs: await Drive.findOrCreateFolder('thumbs', root),
-      board: (await Drive.list(`name='board.json' and '${root}' in parents and trashed=false`))[0]?.id || null,
-    };
-    remember('refboard.folders', folders);
-    meta.remoteVersion = null;
-    saveMeta();
+    // Médias encore rangés dans l'ancien dossier : on s'assure d'en avoir une copie ici, puis on les renverra.
+    for (const b of boards) {
+      for (const it of b.items) {
+        if (!it.fileId || inSpace.has(it.fileId)) continue;
+        if (!(await DB.getBlob('media', it.id))) {
+          const blob = await Drive.download(it.fileId);
+          await DB.putBlob('media', it.id, new Blob([blob], { type: it.mime || blob.type }));
+          MediaCache.touch(it.id, blob.size);
+        }
+        if (it.thumbId && !(await DB.getBlob('thumbs', it.id))) await DB.putBlob('thumbs', it.id, await Drive.download(it.thumbId));
+        it.fileId = null;
+        it.thumbId = null;
+        delete uploaded[it.id];
+        b.updated = new Date().toISOString();
+        DB.putBoard(b);
+      }
+    }
+    remember('refboard.uploaded', uploaded);
+    await uploadPending();
+    const left = allItems().filter((it) => it.type !== 'youtube' && !it.fileId);
+    if (left.length) throw new Error(`Déplacement incomplet : ${left.length} média(s) pas encore envoyé(s). Réessaie avec « Synchroniser maintenant ».`);
+    dirty = true;
+    await push();
+    for (const folder of legacy) await Drive.trash(folder.id); // récupérable 30 jours dans la corbeille du Drive
+    toast('Médias déplacés dans l’espace privé de RefBoard : ils ne prennent plus de place sur ton PC');
   }
 
   // ---------- Planches : récupération, fusion, envoi ----------
 
   // Récupère board.json s'il a changé depuis la dernière fois. Renvoie true si quelque chose a été fusionné.
   async function pull(force) {
-    if (!folders.board) return false;
-    const { version } = await Drive.get(folders.board, 'version');
+    if (!boardFile) return false;
+    const { version } = await Drive.get(boardFile, 'version');
     if (!force && version === meta.remoteVersion) return false;
-    const remote = JSON.parse(await (await Drive.download(folders.board)).text());
+    const remote = JSON.parse(await (await Drive.download(boardFile)).text());
     merge(remote);
     meta.remoteVersion = version;
     saveMeta();
@@ -207,11 +232,10 @@ const Sync = (() => {
           boards: boards.map(({ view, ...b }) => b),
         };
         const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-        const f = folders.board
-          ? await Drive.update(folders.board, blob)
-          : await Drive.upload(blob, { name: 'board.json', parents: [folders.root] });
-        folders.board = f.id;
-        remember('refboard.folders', folders);
+        const f = boardFile
+          ? await Drive.update(boardFile, blob)
+          : await Drive.upload(blob, { name: 'board.json', parents: [SPACE] });
+        boardFile = f.id;
         meta.remoteVersion = f.version;
         saveMeta();
         if (!detail) setState('on');
@@ -238,43 +262,49 @@ const Sync = (() => {
   // ---------- Médias ----------
 
   const skipped = new Set(); // médias ajoutés sur un autre PC et pas encore envoyés par lui
-  let uploading = false;
+  let uploading = null;
 
-  async function uploadPending() {
-    if (uploading || !isOn()) return;
-    uploading = true;
-    try {
-      for (;;) {
-        fillIds();
-        const todo = boards
-          .flatMap((b) => b.items)
-          .filter((it) => it.type !== 'youtube' && !it.fileId && !skipped.has(it.id)); // YouTube : rien à envoyer, juste le lien
-        if (!todo.length) break;
-        const it = todo[0];
-        setState('on', `Envoi vers Drive… (${todo.length})`);
-        const blob = await DB.getBlob('media', it.id);
-        if (!blob) {
-          skipped.add(it.id);
-          continue;
+  function uploadPending() {
+    if (!isOn()) return Promise.resolve();
+    uploading ??= (async () => {
+      try {
+        for (;;) {
+          fillIds();
+          const todo = allItems().filter((it) => it.type !== 'youtube' && !it.fileId && !skipped.has(it.id)); // YouTube : rien à envoyer
+          if (!todo.length) break;
+          const it = todo[0];
+          setState('on', `Envoi vers Drive… (${todo.length})`);
+          const blob = await DB.getBlob('media', it.id);
+          if (!blob) {
+            skipped.add(it.id);
+            continue;
+          }
+          const ext = Object.keys(EXT_TYPES).find((e) => EXT_TYPES[e] === blob.type) || 'bin';
+          const file = await Drive.upload(blob, { name: `media-${it.id}.${ext}`, parents: [SPACE] });
+          const thumb = await DB.getBlob('thumbs', it.id);
+          const t = thumb ? await Drive.upload(thumb, { name: `thumb-${it.id}.webp`, parents: [SPACE] }) : null;
+          uploaded[it.id] = [file.id, t?.id || null];
+          remember('refboard.uploaded', uploaded);
+          fillIds();
+          changed();
         }
-        const ext = Object.keys(EXT_TYPES).find((e) => EXT_TYPES[e] === blob.type) || 'bin';
-        const file = await Drive.upload(blob, { name: `${it.id}.${ext}`, parents: [folders.media] });
-        const thumb = await DB.getBlob('thumbs', it.id);
-        const t = thumb ? await Drive.upload(thumb, { name: `${it.id}.webp`, parents: [folders.thumbs] }) : null;
-        uploaded[it.id] = [file.id, t?.id || null];
-        remember('refboard.uploaded', uploaded);
-        fillIds();
-        changed();
+        setState('on');
+        MediaCache.trim(isUploaded);
+      } catch (e) {
+        fail(e);
+      } finally {
+        uploading = null;
       }
-      setState('on');
-    } catch (e) {
-      fail(e);
-    } finally {
-      uploading = false;
-    }
+    })();
+    return uploading;
   }
 
-  // Téléchargement d'un média absent de ce PC (ajouté depuis un autre), 4 à la fois au plus.
+  // Un original déjà sur le Drive peut quitter le cache local : on le retéléchargera au besoin.
+  function isUploaded(id) {
+    return !!uploaded[id] || allItems().some((it) => it.id === id && it.fileId);
+  }
+
+  // Téléchargement d'un média absent de ce PC (ajouté ailleurs, ou sorti du cache), 4 à la fois au plus.
   const inflight = new Map();
   const waiting = [];
   let active = 0;
@@ -289,6 +319,10 @@ const Sync = (() => {
         .then(async (blob) => {
           if (level === 'full') blob = new Blob([blob], { type: it.mime || blob.type });
           await DB.putBlob(level === 'full' ? 'media' : 'thumbs', it.id, blob);
+          if (level === 'full') {
+            MediaCache.touch(it.id, blob.size);
+            MediaCache.trim(isUploaded);
+          }
           return blob;
         })
         .catch((e) => {
@@ -314,17 +348,24 @@ const Sync = (() => {
     }
   }
 
-  // Met à la corbeille du Drive (récupérable 30 jours) les fichiers qui ne servent plus à aucune planche.
-  // Seulement ceux de plus d'un jour : un autre PC peut être en train d'envoyer un média sans avoir encore mis à jour board.json.
+  // Efface de l'espace privé les fichiers qui ne servent plus à aucune planche depuis 30 jours.
+  // (L'espace privé n'a pas de corbeille : ce délai sert de filet de sécurité.)
   async function cleanupDrive() {
-    const used = new Set(boards.flatMap((b) => b.items.flatMap((it) => [it.fileId, it.thumbId])));
+    const used = new Set(allItems().flatMap((it) => [it.fileId, it.thumbId]));
     for (const ids of Object.values(uploaded)) ids.forEach((id) => used.add(id));
-    if (!used.size) return;
-    const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
-    for (const folder of [folders.media, folders.thumbs]) {
-      const files = await Drive.list(`'${folder}' in parents and trashed=false and createdTime < '${dayAgo}'`, 'id');
-      for (const f of files) if (!used.has(f.id)) await Drive.trash(f.id);
+    if (boardFile) used.add(boardFile);
+    const now = Date.now();
+    const files = await Drive.list('trashed=false', 'id');
+    const unused = new Set(files.map((f) => f.id).filter((id) => !used.has(id)));
+    for (const id of Object.keys(meta.orphans)) if (!unused.has(id)) delete meta.orphans[id];
+    for (const id of unused) {
+      meta.orphans[id] ??= new Date(now).toISOString();
+      if (now - Date.parse(meta.orphans[id]) > KEEP_ORPHANS) {
+        await Drive.remove(id);
+        delete meta.orphans[id];
+      }
     }
+    saveMeta();
   }
 
   // Au retour sur l'onglet : récupère les changements faits depuis un autre PC.
@@ -347,15 +388,16 @@ const Sync = (() => {
         run: async () => {
           dirty = true;
           await push();
-          uploadPending();
+          await uploadPending();
           if (isOn()) toast('Synchronisé avec Google Drive');
         },
       },
-      { label: 'Ouvrir le dossier sur Google Drive', run: () => window.open(`https://drive.google.com/drive/folders/${folders.root}`, '_blank') },
+      { label: 'Tout exporter dans un dossier…', run: exportAll },
+      { label: 'Voir l’espace utilisé sur Drive', run: () => window.open('https://drive.google.com/drive/settings', '_blank') },
       '-',
       { label: 'Se déconnecter de Google Drive', run: signOut, danger: true },
     ]);
   }
 
-  return { start, connect, changed, boardDeleted, uploadPending, fetchBlob, menu, isOn };
+  return { start, connect, changed, boardDeleted, uploadPending, fetchBlob, menu, isOn, isUploaded };
 })();

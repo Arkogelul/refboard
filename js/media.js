@@ -31,6 +31,7 @@ async function importMedia(blob, { name = '', source = '' } = {}) {
   const id = uid();
   await DB.putBlob('media', id, blob);
   await DB.putBlob('thumbs', id, thumb);
+  MediaCache.touch(id, blob.size);
   return {
     id, type, mime, nw, nh, x: 0, y: 0, w: nw, h: nh,
     source, name, added: new Date().toISOString(),

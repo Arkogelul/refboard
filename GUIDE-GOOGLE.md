@@ -19,8 +19,8 @@
 2. **Informations sur l'application** : nom `RefBoard`, adresse e-mail d'assistance = ton adresse.
 3. **Audience** : **Externe**.
 4. **Coordonnées** : ton adresse. Accepte les conditions, puis **Créer**.
-5. Dans le menu de gauche, **Accès aux données** → **Ajouter ou supprimer des niveaux d'accès**. Cherche `drive.file`, coche
-   `.../auth/drive.file` (« Afficher, créer et supprimer uniquement les fichiers Google Drive que vous utilisez avec cette application »), puis **Mettre à jour** et **Enregistrer**.
+5. Dans le menu de gauche, **Accès aux données** → **Ajouter ou supprimer des niveaux d'accès**. Coche
+   `.../auth/drive.appdata` (l'espace privé de l'app) et `.../auth/drive.file`, puis **Mettre à jour** et **Enregistrer**.
 6. Dans le menu de gauche, **Audience** → **Publier l'application** → **Confirmer**.
    `drive.file` est un niveau d'accès « non sensible » : aucune validation par Google n'est nécessaire.
    Si tu laisses l'app en mode « Test », il faut t'ajouter dans **Utilisateurs tests**, et Google peut redemander ton accord chaque semaine.
@@ -57,16 +57,18 @@ La connexion Google ne fonctionne pas avec une page ouverte d'un double-clic (`f
 - **soit sur GitHub Pages** (étape suivante) ;
 - **soit en local** : dans un terminal ouvert dans le dossier `RefBoard`, lance `python -m http.server 8791`, puis ouvre <http://localhost:8791>.
 
-Clique sur **Se connecter à Drive** en haut à droite et choisis ton compte. Un dossier **RefBoard** apparaît alors à la racine de ton Drive, avec :
+Clique sur **Se connecter à Drive** en haut à droite, choisis ton compte et coche les deux autorisations.
 
-- `board.json` : toutes les planches (positions, tailles, liens sources) ;
-- `media/` : les fichiers d'origine ;
-- `thumbs/` : les vignettes.
+RefBoard range tout dans son **espace privé** sur ton Drive : `board.json` (toutes les planches), les fichiers d'origine et les vignettes.
+Cet espace compte dans ton stockage Drive, mais **Google Drive pour ordinateur ne le recopie jamais sur ton PC**.
+Il n'apparaît pas dans « Mon Drive » : sa taille se voit dans Drive → ⚙ Paramètres → **Gérer les applications** → RefBoard.
+Pour récupérer tous tes fichiers dans un dossier normal : bouton **Drive ✓** → **Tout exporter dans un dossier…**.
 
 ## Bon à savoir
 
-- **Ce que RefBoard voit** : uniquement les fichiers qu'il a créés lui-même (niveau d'accès `drive.file`). Le reste de ton Drive lui est invisible.
-- **Ne renomme pas et ne déplace pas** les fichiers de `media/` et `thumbs/` à la main. Tu peux en revanche déplacer le dossier RefBoard lui-même.
+- **Ce que RefBoard voit** : son espace privé, et les fichiers qu'il a créés lui-même. Le reste de ton Drive lui est invisible.
+- **Ancien dossier « RefBoard »** (versions précédentes) : à la connexion, ses médias sont déplacés dans l'espace privé, puis le dossier part à la corbeille du Drive.
+- **Cache du navigateur** : RefBoard garde toutes les vignettes, mais au plus 2 Go d'originaux sur ce PC. Les autres se retéléchargent quand tu zoomes dessus.
 - **Session** : la connexion dure une heure. Ensuite, le bouton passe à « Reconnecter Drive », et ton premier clic dans la page rouvre la session (une petite fenêtre Google s'ouvre et se referme).
-- **Médias supprimés** : ils partent dans la corbeille du Drive, où ils restent récupérables 30 jours. Le ménage se fait à la connexion suivante, et seulement pour les fichiers de plus d'un jour.
+- **Médias supprimés d'une planche** : leurs fichiers restent 30 jours dans l'espace privé (le temps de changer d'avis), puis sont effacés.
 - **Deux PC en même temps** : si tu modifies la même planche sur deux PC à la fois, c'est la dernière modification qui gagne pour cette planche.

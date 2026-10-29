@@ -227,6 +227,7 @@ const Board = (() => {
     // Absent de ce PC (ajouté depuis un autre) : on le récupère sur Google Drive.
     const blob = (await DB.getBlob(level === 'full' ? 'media' : 'thumbs', it.id)) || (await Sync.fetchBlob(it, level));
     if (shown.get(it.id) !== entry || !blob) return;
+    if (level === 'full') MediaCache.touch(it.id, blob.size);
     const url = URL.createObjectURL(blob);
     let node;
     if (level === 'full' && it.type === 'video') {

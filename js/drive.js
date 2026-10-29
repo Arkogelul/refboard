@@ -1,10 +1,12 @@
 // Accès à Google Drive : connexion (Google Identity Services) et appels à l'API Drive v3.
-// Scope drive.file : l'app ne voit que les fichiers qu'elle a créés elle-même, rien d'autre de ton Drive.
+// Les médias vont dans l'espace privé de l'app (drive.appdata) : il compte dans ton stockage Drive,
+// mais n'est jamais recopié sur ton PC par Google Drive pour ordinateur.
+// drive.file sert seulement à reprendre l'ancien dossier visible « RefBoard ». L'app ne voit rien d'autre de ton Drive.
 
 const Drive = (() => {
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-  const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const SCOPES = ['https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/drive.file'];
   const FOLDER = 'application/vnd.google-apps.folder';
   const SMALL = 5 * 1024 * 1024; // au-delà : envoi « reprenable », adapté aux grosses vidéos
 
@@ -14,7 +16,7 @@ const Drive = (() => {
 
   class AuthNeeded extends Error {}
 
-  const hasToken = () => !!auth.token && Date.now() < auth.exp - 60_000;
+  const hasToken = () => !!auth.token && Date.now() < auth.exp - 60_000 && SCOPES.every((s) => auth.scope?.includes(s));
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   async function gisReady() {
@@ -27,10 +29,12 @@ const Drive = (() => {
     if (!CONFIG.googleClientId) throw new Error('Identifiant client Google manquant : renseigne-le dans js/config.js (voir GUIDE-GOOGLE.md)');
     await gisReady();
     return new Promise((ok, ko) => {
-      tokenClient ??= google.accounts.oauth2.initTokenClient({ client_id: CONFIG.googleClientId, scope: SCOPE, callback: () => {} });
+      tokenClient ??= google.accounts.oauth2.initTokenClient({ client_id: CONFIG.googleClientId, scope: SCOPES.join(' '), callback: () => {} });
       tokenClient.callback = (r) => {
         if (r.error) return ko(new Error(r.error_description || r.error));
-        auth = { token: r.access_token, exp: Date.now() + r.expires_in * 1000 };
+        if (!google.accounts.oauth2.hasGrantedAllScopes(r, ...SCOPES))
+          return ko(new AuthNeeded('Coche les deux autorisations demandées par Google pour que RefBoard puisse enregistrer tes médias'));
+        auth = { token: r.access_token, exp: Date.now() + r.expires_in * 1000, scope: r.scope };
         remember('refboard.auth', auth);
         ok();
       };
@@ -53,7 +57,9 @@ const Drive = (() => {
       ...opts,
       headers: { ...opts.headers, Authorization: `Bearer ${auth.token}` },
     });
-    if (r.status === 401) {
+    const insufficient =
+      r.status === 403 && /insufficient|scope/i.test(JSON.stringify(await r.clone().json().catch(() => ({}))));
+    if (r.status === 401 || insufficient) {
       auth = {};
       remember('refboard.auth', auth);
       throw new AuthNeeded('Session Google expirée');
@@ -74,11 +80,12 @@ const Drive = (() => {
 
   const json = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  async function list(q, fields = 'id,name') {
+  // space : 'appDataFolder' (espace privé de l'app) ou 'drive' (Mon Drive).
+  async function list(q, fields = 'id,name', space = 'appDataFolder') {
     const out = [];
     let pageToken = '';
     do {
-      const params = new URLSearchParams({ q, fields: `nextPageToken,files(${fields})`, pageSize: '1000', spaces: 'drive' });
+      const params = new URLSearchParams({ q, fields: `nextPageToken,files(${fields})`, pageSize: '1000', spaces: space });
       if (pageToken) params.set('pageToken', pageToken);
       const j = await (await request(`/files?${params}`)).json();
       out.push(...j.files);
@@ -90,12 +97,11 @@ const Drive = (() => {
   const get = async (id, fields) => (await request(`/files/${id}?fields=${fields}`)).json();
   const download = async (id) => (await request(`/files/${id}?alt=media`)).blob();
   const trash = (id) => request(`/files/${id}`, { ...json({ trashed: true }), method: 'PATCH' });
+  const remove = (id) => request(`/files/${id}`, { method: 'DELETE' }); // l'espace privé n'a pas de corbeille
 
-  async function findOrCreateFolder(name, parent) {
-    const found = await list(`name='${name}' and mimeType='${FOLDER}' and '${parent}' in parents and trashed=false`);
-    if (found.length) return found[0].id;
-    return (await (await request('/files?fields=id', json({ name, mimeType: FOLDER, parents: [parent] }))).json()).id;
-  }
+  // Ancien dossier visible « RefBoard » à la racine de Mon Drive (versions précédentes de l'app).
+  const legacyFolders = () =>
+    list(`name='RefBoard' and mimeType='${FOLDER}' and 'root' in parents and trashed=false`, 'id,name', 'drive');
 
   // Crée un fichier. Renvoie {id, version}.
   async function upload(blob, meta) {
@@ -127,5 +133,5 @@ const Drive = (() => {
     return r.json();
   }
 
-  return { AuthNeeded, hasToken, signIn, signOut, list, get, download, trash, findOrCreateFolder, upload, update };
+  return { AuthNeeded, hasToken, signIn, signOut, list, get, download, trash, remove, legacyFolders, upload, update };
 })();

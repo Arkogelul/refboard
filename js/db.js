@@ -53,3 +53,48 @@ const DB = (() => {
     keys: (store) => run(store, 'readonly', (s) => s.getAllKeys()),
   };
 })();
+
+// Plafond du cache local des originaux : au-delà de 2 Go, on efface ceux vus le moins récemment,
+// à condition qu'ils soient déjà sur le Drive (ils se retéléchargent quand on zoome dessus).
+// Les vignettes, elles, restent toutes : elles sont petites.
+const MediaCache = (() => {
+  const LIMIT = 2 * 1024 ** 3;
+  const index = readJSON('refboard.cache'); // id du média -> [taille, dernier accès]
+  let saveTimer;
+  let trimming = false;
+
+  const save = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => remember('refboard.cache', index), 1000);
+  };
+
+  function touch(id, size) {
+    index[id] = [size ?? index[id]?.[0] ?? 0, Date.now()];
+    save();
+  }
+
+  function forget(id) {
+    delete index[id];
+    save();
+  }
+
+  async function trim(canEvict) {
+    let total = Object.values(index).reduce((s, [n]) => s + n, 0);
+    if (total <= LIMIT || trimming) return;
+    trimming = true;
+    try {
+      for (const [id, [n]] of Object.entries(index).sort((a, b) => a[1][1] - b[1][1])) {
+        if (total <= LIMIT * 0.9) break;
+        if (!canEvict(id)) continue;
+        await DB.deleteBlob('media', id);
+        forget(id);
+        total -= n;
+      }
+    } finally {
+      trimming = false;
+    }
+  }
+
+  const known = (id) => id in index;
+  return { touch, forget, trim, known };
+})();
