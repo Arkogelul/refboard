@@ -25,6 +25,7 @@
     <label><input type="checkbox" id="originals" checked> Remplacer les GIF venus de X, Instagram ou Pinterest par la vidéo d'origine (extension « Vers RefBoard » requise)</label>
     <button id="send">Ouvrir RefBoard et envoyer</button>
     <progress id="progress" value="0" max="1" hidden></progress>
+    <button id="showFailed" hidden>Montrer dans Miro les images en échec</button>
     <div id="log"></div>
   </div>
 
@@ -102,6 +103,7 @@
         $('progress').hidden = false;
         $('progress').max = list.length;
         let failed = 0;
+        const failedItems = [];
         for (const [i, img] of list.entries()) {
           $('progress').value = i;
           try {
@@ -110,9 +112,17 @@
             await deliver(win, [{ blob: file, name: file.name || img.title || `miro_${img.id}`, source, preferOriginal: $('originals').checked }]);
           } catch (e) {
             failed++;
+            failedItems.push(img);
             log(`Image ${i + 1} : ${e.message}`, true);
           }
         }
+        // Les images refusées : on peut les retrouver dans Miro pour les télécharger à la main.
+        $('showFailed').hidden = !failedItems.length;
+        $('showFailed').onclick = async () => {
+          await miro.board.deselect();
+          await miro.board.select({ id: failedItems.map((i) => i.id) });
+          await miro.board.viewport.zoomTo(failedItems);
+        };
         $('progress').value = list.length;
         log(failed ? `Terminé : ${list.length - failed} envoyée(s), ${failed} en échec.` : `Terminé : ${list.length} image(s) envoyée(s) vers RefBoard.`);
       } catch (e) {
