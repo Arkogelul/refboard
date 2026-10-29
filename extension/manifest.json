@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vers RefBoard",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Envoie les images et vidéos de X, Instagram, Pinterest, YouTube et du web vers ta planche RefBoard, avec leur lien d'origine.",
   "permissions": ["contextMenus", "storage", "scripting", "tabs", "declarativeNetRequestWithHostAccess"],
   "host_permissions": ["<all_urls>"],

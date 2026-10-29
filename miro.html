@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>RefBoard · import Miro</title>
+  <script src="https://miro.com/app/static/sdk/v2/miro.js"></script>
+  <style>
+    body { margin: 0; padding: 16px; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #050038; }
+    h1 { font-size: 16px; margin: 0 0 8px; }
+    p { margin: 8px 0; }
+    label { display: block; margin: 8px 0; }
+    button { width: 100%; margin-top: 10px; padding: 10px; border: 0; border-radius: 6px; background: #4c6ef5; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    progress { width: 100%; margin-top: 12px; }
+    #log { margin-top: 10px; font-size: 12px; color: #555; white-space: pre-line; max-height: 240px; overflow: auto; }
+    .err { color: #d93025; }
+  </style>
+</head>
+<body>
+  <div id="panel" hidden>
+    <h1>Envoyer vers RefBoard</h1>
+    <p id="count">Recherche des images…</p>
+    <label><input type="radio" name="scope" value="all" checked> Toutes les images de la planche</label>
+    <label><input type="radio" name="scope" value="selection"> Seulement la sélection</label>
+    <label><input type="checkbox" id="originals" checked> Remplacer les GIF venus de X, Instagram ou Pinterest par la vidéo d'origine (extension « Vers RefBoard » requise)</label>
+    <button id="send">Ouvrir RefBoard et envoyer</button>
+    <progress id="progress" value="0" max="1" hidden></progress>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // Mini-app Miro : s'ouvre dans un panneau de la planche, lit chaque image (fichier d'origine + lien « Lier à l'objet »)
+    // et l'envoie à un onglet RefBoard qu'elle ouvre, via window.postMessage (même origine que RefBoard).
+
+    const REFBOARD = new URL('./?import=miro', location.href).toString();
+    const $ = (id) => document.getElementById(id);
+    const log = (msg, err) => {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      if (err) line.className = 'err';
+      $('log').prepend(line);
+    };
+
+    // Sans « ?panel » : la page tourne en arrière-plan dans Miro et ouvre le panneau au clic sur l'icône.
+    if (!new URLSearchParams(location.search).has('panel')) {
+      miro.board.ui.on('icon:click', () => miro.board.ui.openPanel({ url: `${location.pathname}?panel=1` }));
+    } else {
+      $('panel').hidden = false;
+      countImages();
+      document.querySelectorAll('input[name=scope]').forEach((r) => r.addEventListener('change', countImages));
+      $('send').addEventListener('click', send);
+    }
+
+    async function images() {
+      const scope = document.querySelector('input[name=scope]:checked').value;
+      const items = scope === 'selection' ? (await miro.board.getSelection()).filter((i) => i.type === 'image') : await miro.board.get({ type: 'image' });
+      // Ordre de lecture de la planche : de haut en bas, puis de gauche à droite (par bandes).
+      return items.sort((a, b) => Math.round((a.y - b.y) / 200) || a.x - b.x);
+    }
+
+    async function countImages() {
+      const n = (await images()).length;
+      $('count').textContent = n ? `${n} image${n > 1 ? 's' : ''} à envoyer.` : 'Aucune image.';
+      $('send').disabled = !n;
+    }
+
+    // Ouvre RefBoard dans un nouvel onglet et attend qu'il soit prêt.
+    function openRefBoard() {
+      return new Promise((ok, ko) => {
+        const win = window.open(REFBOARD, '_blank');
+        if (!win) return ko(new Error('Le navigateur a bloqué l’ouverture de RefBoard : autorise les fenêtres pour miro.com'));
+        const timer = setTimeout(() => ko(new Error('RefBoard ne répond pas')), 60000);
+        addEventListener('message', function ready(e) {
+          if (e.source !== win || e.origin !== location.origin || e.data?.refboard !== 'ready') return;
+          removeEventListener('message', ready);
+          clearTimeout(timer);
+          ok(win);
+        });
+      });
+    }
+
+    // Envoie un lot à RefBoard et attend son accusé de réception.
+    function deliver(win, items) {
+      const id = Math.random().toString(36).slice(2);
+      return new Promise((ok, ko) => {
+        addEventListener('message', function done(e) {
+          if (e.source !== win || e.data?.refboard !== 'added' || e.data.id !== id) return;
+          removeEventListener('message', done);
+          e.data.ok ? ok() : ko(new Error(e.data.error || 'Refusé par RefBoard'));
+        });
+        win.postMessage({ refboard: 'add', id, items }, location.origin);
+      });
+    }
+
+    async function send() {
+      $('send').disabled = true;
+      $('log').textContent = '';
+      try {
+        const opening = openRefBoard(); // tout de suite, sinon le navigateur bloque la fenêtre
+        const list = await images();
+        const win = await opening;
+        $('progress').hidden = false;
+        $('progress').max = list.length;
+        let failed = 0;
+        for (const [i, img] of list.entries()) {
+          $('progress').value = i;
+          try {
+            const file = await img.getFile('original');
+            const source = img.linkedTo && !img.linkedTo.includes('moveToWidget') ? img.linkedTo : '';
+            await deliver(win, [{ blob: file, name: file.name || img.title || `miro_${img.id}`, source, preferOriginal: $('originals').checked }]);
+          } catch (e) {
+            failed++;
+            log(`Image ${i + 1} : ${e.message}`, true);
+          }
+        }
+        $('progress').value = list.length;
+        log(failed ? `Terminé : ${list.length - failed} envoyée(s), ${failed} en échec.` : `Terminé : ${list.length} image(s) envoyée(s) vers RefBoard.`);
+      } catch (e) {
+        log(e.message, true);
+      } finally {
+        $('send').disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

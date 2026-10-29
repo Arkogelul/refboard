@@ -14,14 +14,21 @@
     return new Blob([bytes], { type });
   }
 
+  const toPageItem = (it) => (it.data ? { blob: toBlob(it.data, it.type), name: it.name, source: it.source } : it);
+
   addEventListener('message', (e) => {
     if (e.source !== window || !e.data?.refboard || !chrome.runtime?.id) return;
     if (e.data.refboard === 'ready') ready = true;
     if (e.data.refboard === 'fetch') {
+      // La page demande des posts : l'extension les récupère et lui rend les fichiers.
+      const id = e.data.id;
       chrome.runtime
-        .sendMessage({ type: 'sendPosts', urls: e.data.urls })
-        .then((res) => post(res?.ok ? { refboard: 'fetched', message: res.result } : { refboard: 'error', message: res?.error }))
-        .catch((err) => post({ refboard: 'error', message: err.message }));
+        .sendMessage({ type: 'download', urls: e.data.urls })
+        .then((res) => {
+          if (!res?.ok) return post({ refboard: 'error', id, message: res?.error });
+          post({ refboard: 'fetched', id, items: res.result.items.map(toPageItem), note: res.result.note });
+        })
+        .catch((err) => post({ refboard: 'error', id, message: err.message }));
     }
   });
 
@@ -29,7 +36,7 @@
     if (msg.type === 'refboard:ping') return reply({ ready });
     if (msg.type !== 'refboard:add') return;
     const id = Math.random().toString(36).slice(2);
-    const items = msg.items.map((it) => (it.data ? { blob: toBlob(it.data, it.type), name: it.name, source: it.source } : it));
+    const items = msg.items.map(toPageItem);
     const done = (e) => {
       if (e.source !== window || e.data?.refboard !== 'added' || e.data.id !== id) return;
       removeEventListener('message', done);

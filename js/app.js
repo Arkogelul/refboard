@@ -164,10 +164,19 @@ async function importFromUrl(url, at) {
     return toast('Vidéo YouTube ajoutée : double-clic pour la lire');
   }
   if (POST_RE.test(url)) {
-    if (!document.documentElement.dataset.refboardExtension)
+    if (!hasExtension())
       return toast("Pour un post X, Instagram ou Pinterest, installe l'extension « Vers RefBoard » (voir extension/INSTALLER.md).", 'error');
-    window.postMessage({ refboard: 'fetch', urls: [url] }, location.origin);
-    return toast('Récupération du post par l’extension…', 'info', true);
+    toast('Récupération du post par l’extension…', 'info', true);
+    try {
+      const { items, note } = await fetchViaExtension([url]);
+      const added = await toItems(items);
+      Board.addItems(added, at);
+      Sync.uploadPending();
+      toast(`${added.length} média${added.length > 1 ? 's' : ''} ajouté${added.length > 1 ? 's' : ''}${note ? ` — ${note}` : ''}`);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+    return;
   }
   toast('Téléchargement…', 'info', true);
   try {
@@ -220,39 +229,96 @@ $('fileInput').onchange = (e) => {
   e.target.value = '';
 };
 
-// ---------- Extension « Vers RefBoard » ----------
-// Elle dépose ses médias dans cette page via window.postMessage (voir extension/refboard-bridge.js).
+// ---------- Envois de l'extension et de la mini-app Miro ----------
+// L'extension « Vers RefBoard » parle à cette page par window.postMessage (voir extension/refboard-bridge.js).
+// La mini-app Miro (miro.html, même origine) ouvre cette page et lui envoie ses images une à une.
 
 let appReady = false;
+const hasExtension = () => !!document.documentElement.dataset.refboardExtension;
+const pending = new Map(); // demandes en cours à l'extension : id -> { ok, ko }
 
 addEventListener('message', async (e) => {
-  if (e.source !== window || !e.data?.refboard) return;
+  const fromBridge = e.source === window;
+  const fromMiro = !fromBridge && e.origin === location.origin && !!e.source;
+  if ((!fromBridge && !fromMiro) || !e.data?.refboard) return;
   const msg = e.data;
-  if (msg.refboard === 'hello' && appReady) window.postMessage({ refboard: 'ready' }, location.origin);
-  if (msg.refboard === 'fetched') toast(msg.message);
-  if (msg.refboard === 'error') toast(msg.message || "L'extension n'a pas pu récupérer ce post", 'error');
+  if (msg.refboard === 'hello' && appReady && fromBridge) window.postMessage({ refboard: 'ready' }, location.origin);
+  if (fromBridge && (msg.refboard === 'fetched' || msg.refboard === 'error') && pending.has(msg.id)) {
+    const p = pending.get(msg.id);
+    pending.delete(msg.id);
+    if (msg.refboard === 'fetched') p.ok(msg);
+    else p.ko(new Error(msg.message || "L'extension n'a pas pu récupérer ce post"));
+  }
   if (msg.refboard === 'add') {
     let ok = true;
     let error;
     try {
-      await receiveFromExtension(msg.items);
+      await receive(msg.items, fromMiro);
     } catch (err) {
       ok = false;
       error = err.message;
     }
-    window.postMessage({ refboard: 'added', id: msg.id, ok, error }, location.origin);
+    e.source.postMessage({ refboard: 'added', id: msg.id, ok, error }, location.origin);
   }
 });
 
-async function receiveFromExtension(list) {
+// Demande à l'extension de récupérer des posts ; elle renvoie leurs médias (fichiers ou cartes YouTube).
+function fetchViaExtension(urls) {
+  const id = uid();
+  return new Promise((ok, ko) => {
+    pending.set(id, { ok, ko });
+    window.postMessage({ refboard: 'fetch', id, urls }, location.origin);
+  });
+}
+
+// Médias reçus → éléments de planche.
+async function toItems(list) {
   const items = [];
   for (const it of list) {
     if (it.kind === 'youtube') items.push(youtubeItem(it.id, { short: it.short, source: it.source }));
     else items.push(await importMedia(it.blob, { name: it.name, source: it.source }));
   }
-  Board.addItems(items, Board.dropPoint());
+  return items;
+}
+
+// Un GIF importé de Miro était souvent une vidéo X / Instagram / Pinterest convertie : on reprend la vidéo d'origine.
+async function upgradeGif(it) {
+  if (!it.preferOriginal || it.blob?.type !== 'image/gif' || !POST_RE.test(it.source || '') || !hasExtension()) return [it];
+  try {
+    const { items } = await fetchViaExtension([it.source]);
+    return items.length ? items : [it];
+  } catch {
+    return [it]; // post supprimé ou inaccessible : on garde le GIF
+  }
+}
+
+// Les envois successifs de Miro se rangent les uns après les autres, en lignes.
+let flow = null;
+function flowPoint(item, gap = 16) {
+  const now = Date.now();
+  if (!flow || now - flow.last > 15000) {
+    const p = Board.dropPoint();
+    flow = { x0: p.x, x: p.x, y: p.y, last: now };
+  }
+  const w = (300 * item.nw) / (item.nh || 1);
+  if (flow.x > flow.x0 && flow.x + w > flow.x0 + 3000) {
+    flow.x = flow.x0;
+    flow.y += 300 + gap;
+  }
+  const at = { x: flow.x + w / 2, y: flow.y + 150 };
+  flow.x += w + gap;
+  flow.last = now;
+  return at;
+}
+
+async function receive(list, fromMiro) {
+  if (fromMiro) list = (await Promise.all(list.map(upgradeGif))).flat();
+  const items = await toItems(list);
+  if (fromMiro) for (const it of items) Board.addItems([it], flowPoint(it));
+  else Board.addItems(items, Board.dropPoint());
   Sync.uploadPending();
-  toast(`${items.length} média${items.length > 1 ? 's' : ''} reçu${items.length > 1 ? 's' : ''} de l'extension`);
+  const n = items.length;
+  toast(`${n} média${n > 1 ? 's' : ''} reçu${n > 1 ? 's' : ''}${fromMiro ? ' de Miro' : " de l'extension"}`);
 }
 
 // ---------- Barre d'outils et réglages ----------
@@ -467,6 +533,9 @@ addEventListener('keydown', (e) => {
     Sync.start();
     appReady = true;
     window.postMessage({ refboard: 'ready' }, location.origin);
+    // Ouvert par la mini-app Miro : on lui signale qu'on est prêt à recevoir.
+    if (window.opener && new URLSearchParams(location.search).get('import') === 'miro')
+      window.opener.postMessage({ refboard: 'ready' }, location.origin);
   } catch (e) {
     toast(`Stockage local indisponible : ${e.message}`, 'error', true);
   }

@@ -56,6 +56,12 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return errors.length ? `${result} — ${errors.length} lien(s) en échec` : result;
     }
     if (msg.type === 'refboardTab') return (await findRefBoardTab())?.title || null;
+    if (msg.type === 'download') {
+      // Demandé par la page RefBoard elle-même : on lui rend les fichiers au lieu de les envoyer à un onglet.
+      const all = [];
+      for (const url of msg.urls) all.push(...(await resolvePost(url)));
+      return prepare(all);
+    }
   })().then(
     (result) => reply({ ok: true, result }),
     (e) => reply({ ok: false, error: e.message })
@@ -114,6 +120,23 @@ async function download(url, kind, referer) {
 async function sendToRefBoard(items, sourceTab) {
   if (!items?.length) throw new Error('Aucun média à envoyer');
   const tab = await refBoardTab();
+  const { items: payload, note } = await prepare(items, sourceTab);
+  const res = await chrome.tabs.sendMessage(tab.id, { type: 'refboard:add', items: payload });
+  if (!res?.ok) throw new Error(res?.error || "RefBoard n'a pas pu ajouter les médias");
+
+  const { focus = false } = await chrome.storage.local.get('focus');
+  if (focus) {
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+  }
+  const n = payload.length;
+  return `${n} média${n > 1 ? 's' : ''} envoyé${n > 1 ? 's' : ''} vers RefBoard${note ? ` (${note})` : ''}`;
+}
+
+// Télécharge les médias (en base64, pour traverser les messages de l'extension).
+// Une vidéo impossible à récupérer est remplacée par sa vignette, avec le lien.
+async function prepare(items, sourceTab) {
+  if (!items?.length) throw new Error('Aucun média trouvé');
   const payload = [];
   let thumbsOnly = 0;
   for (const it of items) {
@@ -133,18 +156,8 @@ async function sendToRefBoard(items, sourceTab) {
       thumbsOnly++;
     }
   }
-  const res = await chrome.tabs.sendMessage(tab.id, { type: 'refboard:add', items: payload });
-  if (!res?.ok) throw new Error(res?.error || "RefBoard n'a pas pu ajouter les médias");
-
-  const { focus = false } = await chrome.storage.local.get('focus');
-  if (focus) {
-    await chrome.tabs.update(tab.id, { active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
-  }
-  const n = payload.length;
-  let msg = `${n} média${n > 1 ? 's' : ''} envoyé${n > 1 ? 's' : ''} vers RefBoard`;
-  if (thumbsOnly) msg += ` (vignette et lien seulement pour ${thumbsOnly} vidéo${thumbsOnly > 1 ? 's' : ''})`;
-  return msg;
+  const note = thumbsOnly ? `vignette et lien seulement pour ${thumbsOnly} vidéo${thumbsOnly > 1 ? 's' : ''}` : '';
+  return { items: payload, note };
 }
 
 const IMAGE_FILE_RE = /\.(jpe?g|png|gif|webp)(\?|$)/i;
