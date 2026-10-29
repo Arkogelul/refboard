@@ -87,11 +87,13 @@ async function findRefBoardTab() {
 }
 
 // Onglet RefBoard prêt à recevoir : on l'ouvre en arrière-plan s'il ne l'est pas, puis on attend qu'il réponde.
+// Un onglet ouvert avant une mise à jour de RefBoard ne sait pas répondre : on le recharge une fois.
 async function refBoardTab() {
   const tab = (await findRefBoardTab()) || (await chrome.tabs.create({ url: REFBOARD_URL, active: false }));
   for (let i = 0; i < 60; i++) {
     const r = await chrome.tabs.sendMessage(tab.id, { type: 'refboard:ping' }).catch(() => null);
     if (r?.ready) return tab;
+    if (i === 6) await chrome.tabs.reload(tab.id);
     await sleep(500);
   }
   throw new Error("RefBoard ne répond pas : recharge son onglet et réessaie");
