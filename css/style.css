@@ -76,7 +76,35 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 .item .badge span { display: block; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
 .item.tiny .tools, .item.tiny .badge { display: none; }
 
+.item.dragging { z-index: 10; }
+
+/* Cadres : le fond laisse passer les clics, seuls les bords et l'onglet s'attrapent */
+.frame {
+  position: absolute; left: 0; top: 0; pointer-events: none; --edge: calc(14px * var(--inv));
+  background: rgba(255, 255, 255, .025);
+}
+#world.animate .frame { transition: transform .4s ease, width .4s ease, height .4s ease; }
+.frame-edge { position: absolute; pointer-events: auto; cursor: move; background: #3a3a44; transition: background .12s; }
+.frame-edge.top { left: calc(-1 * var(--edge)); right: calc(-1 * var(--edge)); top: calc(-1 * var(--edge)); height: var(--edge); }
+.frame-edge.bottom { left: calc(-1 * var(--edge)); right: calc(-1 * var(--edge)); bottom: calc(-1 * var(--edge)); height: var(--edge); }
+.frame-edge.left { top: 0; bottom: 0; left: calc(-1 * var(--edge)); width: var(--edge); }
+.frame-edge.right { top: 0; bottom: 0; right: calc(-1 * var(--edge)); width: var(--edge); }
+.frame:hover .frame-edge, .frame:hover .frame-tab { background: #4d4d5a; }
+.frame.selected .frame-edge, .frame.selected .frame-tab, .frame.drop-target .frame-edge, .frame.drop-target .frame-tab { background: var(--accent); }
+.frame.drop-target { background: rgba(76, 110, 245, .1); }
+.frame-tab {
+  position: absolute; left: calc(-1 * var(--edge)); bottom: calc(100% + var(--edge));
+  max-width: 340px; padding: 5px 12px 4px; border-radius: 8px 8px 0 0;
+  background: #3a3a44; color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; user-select: none;
+  pointer-events: auto; cursor: move; transform: scale(var(--inv)); transform-origin: bottom left; transition: background .12s;
+}
+.frame-tab input { width: 220px; padding: 0 4px; border: 0; border-radius: 3px; background: #111; font-weight: 600; cursor: text; }
+
 /* Sélection */
+#selBox.no-handles .handle { display: none; }
+#dropMark { position: absolute; width: 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 1px #fff; }
+#dropMark[hidden] { display: none; }
 #overlay { position: absolute; inset: 0; pointer-events: none; }
 #selBox { position: absolute; border: 1px solid var(--accent); }
 #selBox[hidden], #rubber[hidden] { display: none; }

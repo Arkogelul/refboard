@@ -42,6 +42,7 @@ const Sync = (() => {
   function fail(e) {
     if (e instanceof Drive.AuthNeeded) {
       setState('auth');
+      reconnectOnClick();
       if (e.message.startsWith('Coche')) toast(e.message, 'error');
     } else {
       setState('error');
@@ -56,11 +57,12 @@ const Sync = (() => {
     if (state === 'connecting') return;
     setState('connecting');
     try {
-      if (interactive || !Drive.hasToken()) await Drive.signIn();
+      if (!Drive.hasToken()) await Drive.signIn(); // la fenêtre Google doit suivre un clic : on la tente d'abord
       const found = (await Drive.list(`name='board.json' and trashed=false`, 'id'))[0]?.id || null;
       if (found !== boardFile) meta.remoteVersion = null;
       boardFile = found;
       remember('refboard.drive', '1');
+      Drive.rememberAccount().catch((e) => console.warn('Compte Google non mémorisé', e));
       setState('on');
       await pull(true);
       await migrateLegacy();
@@ -74,13 +76,34 @@ const Sync = (() => {
     }
   }
 
-  // Au démarrage : reconnexion silencieuse si le jeton est encore valable, sinon au premier clic.
-  function start() {
+  // Au démarrage : reconnexion silencieuse (jeton encore valable, ou nouveau jeton via l'extension), sinon au premier clic.
+  async function start() {
     setState('off');
     if (localStorage.getItem('refboard.drive') !== '1') return;
-    if (Drive.hasToken()) return connect(false);
-    setState('auth');
-    addEventListener('pointerdown', () => state === 'auth' && connect(true), { once: true, capture: true });
+    if (!Drive.hasToken()) {
+      setState('connecting');
+      if (!(await Drive.refresh())) {
+        setState('auth');
+        return reconnectOnClick();
+      }
+      state = 'off'; // connect refuse de démarrer pendant « connecting »
+    }
+    connect(false);
+  }
+
+  // Sans extension, Google exige un clic pour rouvrir sa fenêtre : on se sert du prochain clic dans la page.
+  let waitingClick = false;
+  function reconnectOnClick() {
+    if (waitingClick) return;
+    waitingClick = true;
+    addEventListener(
+      'pointerdown',
+      () => {
+        waitingClick = false;
+        if (state === 'auth') connect(true);
+      },
+      { once: true, capture: true }
+    );
   }
 
   function signOut() {

@@ -69,6 +69,6 @@ Pour récupérer tous tes fichiers dans un dossier normal : bouton **Drive ✓**
 - **Ce que RefBoard voit** : son espace privé, et les fichiers qu'il a créés lui-même. Le reste de ton Drive lui est invisible.
 - **Ancien dossier « RefBoard »** (versions précédentes) : à la connexion, ses médias sont déplacés dans l'espace privé, puis le dossier part à la corbeille du Drive.
 - **Cache du navigateur** : RefBoard garde toutes les vignettes, mais au plus 2 Go d'originaux sur ce PC. Les autres se retéléchargent quand tu zoomes dessus.
-- **Session** : la connexion dure une heure. Ensuite, le bouton passe à « Reconnecter Drive », et ton premier clic dans la page rouvre la session (une petite fenêtre Google s'ouvre et se referme).
+- **Session** : avec l'extension « Vers RefBoard », la connexion se renouvelle toute seule, sans fenêtre, tant que Chrome reste connecté à ton compte Google. Cela demande l'URI de redirection `https://bggnbhfjncabfhpacbdgklhlppadfphb.chromiumapp.org/` sur l'identifiant client, et une app publiée (hors mode « Test »). Sans l'extension, la connexion dure une heure : ensuite, ton premier clic dans la page la rouvre (une petite fenêtre Google s'ouvre et se referme).
 - **Médias supprimés d'une planche** : leurs fichiers restent 30 jours dans l'espace privé (le temps de changer d'avis), puis sont effacés.
 - **Deux PC en même temps** : si tu modifies la même planche sur deux PC à la fois, c'est la dernière modification qui gagne pour cette planche.

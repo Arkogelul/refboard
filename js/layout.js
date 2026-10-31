@@ -70,6 +70,35 @@ const Layout = (() => {
     return out;
   }
 
+  // Blocs de taille fixe (cadres et médias libres), posés en lignes sans être redimensionnés.
+  // cols > 0 : un nombre fixe de blocs par ligne ; sinon on passe à la ligne au-delà de width.
+  function shelves(items, { x, y, width, gap, cols = 0 }) {
+    const out = new Map();
+    let left = x;
+    let top = y;
+    let rowH = 0;
+    let n = 0;
+    for (const it of items) {
+      if (n && (cols ? n >= cols : left + it.w > x + width)) {
+        left = x;
+        top += rowH + gap;
+        rowH = 0;
+        n = 0;
+      }
+      out.set(it.id, { x: left, y: top });
+      left += it.w + gap;
+      rowH = Math.max(rowH, it.h);
+      n++;
+    }
+    return out;
+  }
+
+  // Largeur automatique pour shelves : vise aussi un ensemble au format 16:9.
+  function shelfWidth(items, gap) {
+    const area = items.reduce((s, it) => s + (it.w + gap) * (it.h + gap), 0);
+    return Math.max(Math.max(...items.map((it) => it.w)), Math.sqrt((16 / 9) * area));
+  }
+
   // Largeur automatique : vise un ensemble au format 16:9.
   function autoWidth(items, height, gap) {
     const linear = items.reduce((s, it) => s + ratio(it) * height + gap, 0);
@@ -79,5 +108,5 @@ const Layout = (() => {
 
   const autoCols = (n) => Math.max(1, Math.round(Math.sqrt((n * 16) / 9)));
 
-  return { readingOrder, justifiedRows, grid, autoWidth, autoCols };
+  return { readingOrder, justifiedRows, grid, shelves, shelfWidth, autoWidth, autoCols };
 })();

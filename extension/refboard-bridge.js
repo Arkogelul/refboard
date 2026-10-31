@@ -19,6 +19,14 @@
   addEventListener('message', (e) => {
     if (e.source !== window || !e.data?.refboard || !chrome.runtime?.id) return;
     if (e.data.refboard === 'ready') ready = true;
+    if (e.data.refboard === 'token') {
+      // Jeton Google pour rester connecté à Drive sans fenêtre.
+      const id = e.data.id;
+      chrome.runtime
+        .sendMessage({ type: 'googleToken', hint: e.data.hint })
+        .then((res) => post({ refboard: 'token-result', id, ...(res?.ok ? res.result : {}) }))
+        .catch(() => post({ refboard: 'token-result', id }));
+    }
     if (e.data.refboard === 'fetch') {
       // La page demande des posts : l'extension les récupère et lui rend les fichiers.
       const id = e.data.id;

@@ -54,6 +54,7 @@ Board.onChange = scheduleSave;
 Board.onSelection = (n) => {
   $('arrangeBtn').textContent = n >= 2 ? 'Ranger la sélection' : 'Tout ranger';
   $('uniformBtn').textContent = n >= 1 ? 'Taille uniforme (sélection)' : 'Taille uniforme';
+  $('frameBtn').textContent = Board.selectedItems().length ? 'Mettre dans un cadre' : 'Nouveau cadre';
 };
 addEventListener('visibilitychange', () => document.hidden && saveNow());
 addEventListener('pagehide', saveNow);
@@ -315,8 +316,8 @@ function flowPoint(item, gap = 16) {
 async function receive(list, fromMiro) {
   if (fromMiro) list = (await Promise.all(list.map(upgradeGif))).flat();
   const items = await toItems(list);
-  if (fromMiro) for (const it of items) Board.addItems([it], flowPoint(it));
-  else Board.addItems(items, Board.dropPoint());
+  if (fromMiro) for (const it of items) Board.addItems([it], flowPoint(it), false);
+  else Board.addItems(items, Board.dropPoint(), false);
   Sync.uploadPending();
   const n = items.length;
   toast(`${n} média${n > 1 ? 's' : ''} reçu${n > 1 ? 's' : ''}${fromMiro ? ' de Miro' : " de l'extension"}`);
@@ -337,6 +338,7 @@ $('boardMenuBtn').onclick = (e) => {
 $('driveBtn').onclick = (e) => Sync.menu(e.currentTarget);
 $('arrangeBtn').onclick = () => Board.arrange(settings);
 $('uniformBtn').onclick = () => Board.uniform(settings.uniformDim, +settings.uniformSize);
+$('frameBtn').onclick = () => Board.createFrame();
 
 const panel = $('settingsPanel');
 function syncPanel() {
@@ -400,8 +402,22 @@ function closeMenu() {
 
 stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  const frame = Board.frameOf(e.target);
+  if (frame) {
+    Board.select(frame.id);
+    return openMenu(e.clientX, e.clientY, [
+      { label: 'Renommer le cadre…', run: () => Board.renameFrame(frame.id) },
+      { label: 'Ranger le contenu', run: () => Board.arrange(settings) },
+      '-',
+      { label: 'Supprimer le cadre (garde les médias)', run: Board.deleteSelected, danger: true },
+    ]);
+  }
   const it = Board.itemOf(e.target);
-  if (!it) return;
+  if (!it) {
+    return openMenu(e.clientX, e.clientY, [
+      { label: Board.selectedItems().length ? 'Mettre dans un cadre' : 'Nouveau cadre ici', run: Board.createFrame },
+    ]);
+  }
   Board.select(it.id);
   const n = Board.selectionSize();
   const entries = [];
@@ -423,6 +439,9 @@ stage.addEventListener('contextmenu', (e) => {
     }
     entries.push('-');
   }
+  entries.push({ label: 'Mettre dans un cadre', run: Board.createFrame });
+  if (Board.selectedItems().some((sel) => Board.inFrame(sel.id))) entries.push({ label: 'Sortir du cadre', run: Board.ejectSelected });
+  entries.push('-');
   entries.push({ label: 'Mettre au premier plan', run: Board.bringToFront });
   entries.push({ label: "Mettre à l'arrière-plan", run: Board.sendToBack });
   entries.push('-');
@@ -509,6 +528,7 @@ addEventListener('keydown', (e) => {
     panel.hidden = true;
     Board.clearSelection();
   } else if (ctrl && key === 'a') Board.selectAll();
+  else if (ctrl && key === 'g') Board.createFrame();
   else if (ctrl && key === 'z' && !e.shiftKey) Board.undo();
   else if (ctrl && (key === 'y' || (key === 'z' && e.shiftKey))) Board.redo();
   else if (ctrl && (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd')) Board.zoomBy(1.25);

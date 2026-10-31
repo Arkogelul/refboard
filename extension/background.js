@@ -4,6 +4,8 @@ importScripts('shared.js');
 const REFBOARD_URL = 'https://arkogelul.github.io/refboard/';
 const REFBOARD_TABS = ['https://arkogelul.github.io/refboard/*', 'http://localhost:8791/*'];
 const MAX_BYTES = 45 * 1024 * 1024; // au-delà, un message entre onglets devient trop lourd : on garde la vignette
+const GOOGLE_CLIENT_ID = '673906783098-hi1r99h34cnrlfrf4d7si4mirjtv8eg9.apps.googleusercontent.com'; // le même que js/config.js
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 
 chrome.runtime.onInstalled.addListener(() => {
   reinjectContentScripts();
@@ -55,6 +57,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       const result = await sendToRefBoard(all);
       return errors.length ? `${result} — ${errors.length} lien(s) en échec` : result;
     }
+    if (msg.type === 'googleToken') {
+      const fromRefBoard = sender.origin === new URL(REFBOARD_URL).origin || sender.origin === 'http://localhost:8791';
+      if (!fromRefBoard) throw new Error('Réservé à RefBoard');
+      return googleToken(msg.hint);
+    }
     if (msg.type === 'refboardTab') return (await findRefBoardTab())?.title || null;
     if (msg.type === 'download') {
       // Demandé par la page RefBoard elle-même : on lui rend les fichiers au lieu de les envoyer à un onglet.
@@ -87,6 +94,22 @@ function toast(tab, message, ok) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Nouveau jeton Google sans aucune fenêtre, tant que le navigateur est connecté au compte et que RefBoard est autorisé.
+async function googleToken(hint) {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID, response_type: 'token', scope: GOOGLE_SCOPES, prompt: 'none',
+    redirect_uri: chrome.identity.getRedirectURL(),
+  });
+  if (hint) params.set('login_hint', hint);
+  const url = await chrome.identity.launchWebAuthFlow({
+    url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+    interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 10000,
+  });
+  const r = new URLSearchParams(new URL(url).hash.slice(1));
+  if (!r.get('access_token')) throw new Error(r.get('error') || 'Pas de jeton Google');
+  return { token: r.get('access_token'), expiresIn: +r.get('expires_in'), scope: r.get('scope') };
+}
+
 async function findRefBoardTab() {
   const tabs = await chrome.tabs.query({ url: REFBOARD_TABS });
   return tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
@@ -107,14 +130,48 @@ async function refBoardTab() {
 
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' };
 
-async function download(url, kind, referer) {
-  const r = await withReferer(url, referer, () => fetch(url));
-  if (!r.ok) throw new Error(`Téléchargement impossible (${r.status})`);
+// Une page de protection (Cloudflare…) peut répondre en HTML à la place du fichier.
+const isFile = (r) => r.ok && !(r.headers.get('content-type') || '').startsWith('text/html');
+
+async function download(url, kind, referer, tab) {
+  let f = null;
+  let status = 0;
+  // D'abord sans cookies, puis avec ceux du navigateur (sites qui exigent une session ou une vérification déjà passée).
+  for (const credentials of ['same-origin', 'include']) {
+    const r = await withReferer(url, referer, () => fetch(url, { credentials })).catch(() => null);
+    if (r && isFile(r)) {
+      const blob = await r.blob();
+      if (blob.size > MAX_BYTES) throw new Error('Fichier trop lourd');
+      f = { type: (blob.type || '').split(';')[0], data: await blobToBase64(blob) };
+      break;
+    }
+    status = r?.status || status;
+  }
+  // En dernier recours, depuis l'onglet où le média est affiché : c'est là que le site reconnaît le navigateur.
+  if (!f && tab?.id) f = await fetchFromTab(url, tab).catch(() => null);
+  if (!f) {
+    const why = status ? ` (${status})` : '';
+    throw new Error(`Téléchargement impossible${why} : ouvre le média dans son propre onglet et réessaie, ou enregistre-le et glisse-le dans RefBoard`);
+  }
+  if (!EXT[f.type]) f.type = kind === 'video' ? 'video/mp4' : 'image/jpeg';
+  return f;
+}
+
+async function fetchFromTab(url, tab) {
+  const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: fetchInPage, args: [url, MAX_BYTES] });
+  return result;
+}
+
+// Exécutée dans l'onglet : ne peut rien utiliser de ce fichier.
+async function fetchInPage(url, maxBytes) {
+  const r = await fetch(url, { credentials: 'include' });
+  if (!r.ok || (r.headers.get('content-type') || '').startsWith('text/html')) return null;
   const blob = await r.blob();
-  if (blob.size > MAX_BYTES) throw new Error('Fichier trop lourd');
-  let type = (blob.type || '').split(';')[0];
-  if (!EXT[type]) type = kind === 'video' ? 'video/mp4' : 'image/jpeg';
-  return { type, data: await blobToBase64(blob) };
+  if (blob.size > maxBytes) return null;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return { type: (blob.type || '').split(';')[0], data: btoa(s) };
 }
 
 async function sendToRefBoard(items, sourceTab) {
@@ -146,12 +203,12 @@ async function prepare(items, sourceTab) {
     }
     if (it.kind === 'video') toast(sourceTab, 'Téléchargement de la vidéo…', true);
     try {
-      const f = await download(it.url, it.kind, it.referer);
+      const f = await download(it.url, it.kind, it.referer, sourceTab);
       payload.push({ name: `${it.name}.${EXT[f.type]}`, type: f.type, data: f.data, source: it.source });
     } catch (e) {
       // Vidéo impossible à récupérer : on garde au moins sa vignette et le lien.
       if (!it.thumb) throw e;
-      const f = await download(it.thumb, 'image', it.referer);
+      const f = await download(it.thumb, 'image', it.referer, sourceTab);
       payload.push({ name: `${it.name}_vignette.${EXT[f.type]}`, type: f.type, data: f.data, source: it.source });
       thumbsOnly++;
     }

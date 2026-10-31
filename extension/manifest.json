@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Vers RefBoard",
-  "version": "2.1.0",
+  "version": "2.2.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApRAe3QAJCdCPOCZUBSXqeQrMb6FCdIYSeYNO2XOHkKuTpwLnlW5yxa1EAGHYN0RDjlBejuhliG8oQsBpBVNQCLSnIyMGf6ruWLGjwg2L4I/C1TtRyhWcc7HLr3/b9Cva/HUubxuY1vDu+Lo61oSptcV68/FxeZ1+WyDIIL44yYE6Je4y0AM0MnPyksHQfsChFgdBTcoernvc2p/zvWHW+S5/1tMnX9aoC1qecCQHoMNrTQm3cY32onn605m/DJF59PgxAThdQhrURaTC7jMycj3CundvQBT5lafSTwq9rcyB5/FcA3/Ko55LPDJE+B7RqmKZwQsWiebeyKjMUXZySQIDAQAB",
   "description": "Envoie les images et vidéos de X, Instagram, Pinterest, YouTube et du web vers ta planche RefBoard, avec leur lien d'origine.",
-  "permissions": ["contextMenus", "storage", "scripting", "tabs", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["contextMenus", "storage", "scripting", "tabs", "declarativeNetRequestWithHostAccess", "identity"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup.html", "default_title": "Vers RefBoard" },

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RefBoard</title>
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <header id="toolbar">
@@ -19,6 +19,7 @@
     <span class="sep"></span>
     <button id="arrangeBtn" class="primary">Tout ranger</button>
     <button id="uniformBtn">Taille uniforme</button>
+    <button id="frameBtn" title="Regrouper dans un cadre (Ctrl+G)">Nouveau cadre</button>
     <button id="settingsBtn" class="icon" title="Réglages du rangement">⚙</button>
     <span class="grow"></span>
     <span id="status"></span>
@@ -35,6 +36,7 @@
         <div class="handle" data-corner="se"></div>
       </div>
       <div id="rubber" hidden></div>
+      <div id="dropMark" hidden></div>
     </div>
     <div id="empty" hidden>
       <div>
@@ -99,13 +101,13 @@
   <div id="toast"></div>
 
   <script src="https://accounts.google.com/gsi/client" async></script>
-  <script src="js/config.js?v=6"></script>
-  <script src="js/db.js?v=6"></script>
-  <script src="js/layout.js?v=6"></script>
-  <script src="js/media.js?v=6"></script>
-  <script src="js/drive.js?v=6"></script>
-  <script src="js/board.js?v=6"></script>
-  <script src="js/sync.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/config.js?v=7"></script>
+  <script src="js/db.js?v=7"></script>
+  <script src="js/layout.js?v=7"></script>
+  <script src="js/media.js?v=7"></script>
+  <script src="js/drive.js?v=7"></script>
+  <script src="js/board.js?v=7"></script>
+  <script src="js/sync.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>

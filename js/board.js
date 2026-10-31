@@ -6,10 +6,16 @@ const Board = (() => {
   const world = document.getElementById('world');
   const selBox = document.getElementById('selBox');
   const rubber = document.getElementById('rubber');
+  const dropMark = document.getElementById('dropMark');
 
   const MIN_ZOOM = 0.02;
   const MAX_ZOOM = 8;
   const NEW_HEIGHT = 300; // hauteur des médias ajoutés, en unités du canevas
+  const FRAME_PAD = 24; // marge entre le bord d'un cadre et ses médias
+  const FRAME_MIN_W = 300;
+  const FRAME_MIN_H = 160;
+  const FRAME_GAP = 120; // écart minimal entre cadres rangés (laisse la place aux bords et aux onglets)
+  const FRAME_EDGE = 14; // épaisseur du bord attrapable, en pixels à l'écran
 
   const view = { x: 0, y: 0, s: 1 }; // écran = canevas × s + (x, y)
   const els = new Map(); // id -> élément DOM
@@ -21,6 +27,7 @@ const Board = (() => {
   const redoStack = [];
   let board = null;
   let spaceDown = false;
+  let endRename = null; // valide le renommage de cadre en cours
   let pointer = null; // dernière position de la souris sur le canevas (coordonnées écran)
 
   const api = {
@@ -31,7 +38,19 @@ const Board = (() => {
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const byId = (id) => board.items.find((it) => it.id === id);
   const selItems = () => board.items.filter((it) => selected.has(it.id));
+  const frameById = (id) => board.frames.find((f) => f.id === id);
+  const frameOfItem = (id) => board.frames.find((f) => f.ids.includes(id));
+  const selFrames = () => board.frames.filter((f) => selected.has(f.id));
+  const selBlocks = () => [...selFrames(), ...selItems()];
+  const allBlocks = () => [...board.frames, ...board.items];
+  const freeItems = () => {
+    const inFrame = new Set(board.frames.flatMap((f) => f.ids));
+    return board.items.filter((it) => !inFrame.has(it.id));
+  };
+  // Cadres contenant au moins un média sélectionné.
+  const framesOfSelection = () => [...new Set(selItems().map((it) => frameOfItem(it.id)).filter(Boolean))];
   const intersects = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const encloses = (a, b) => b.x >= a.x && b.y >= a.y && b.x + b.w <= a.x + a.w && b.y + b.h <= a.y + a.h;
 
   function bounds(items) {
     if (!items.length) return null;
@@ -133,6 +152,7 @@ const Board = (() => {
   const BADGES = { gif: 'GIF', video: 'VIDÉO', youtube: 'YOUTUBE' };
 
   function makeEl(it) {
+    if (it.ids) return makeFrameEl(it);
     const el = document.createElement('div');
     el.className = 'item';
     el.dataset.id = it.id;
@@ -148,11 +168,26 @@ const Board = (() => {
     return el;
   }
 
+  // Cadre : un fond transparent qui laisse passer les clics, quatre bords épais et un onglet attrapables.
+  function makeFrameEl(f) {
+    const el = document.createElement('div');
+    el.className = 'frame';
+    el.dataset.id = f.id;
+    el.innerHTML =
+      '<div class="frame-edge top"></div><div class="frame-edge right"></div>' +
+      '<div class="frame-edge bottom"></div><div class="frame-edge left"></div>' +
+      '<div class="frame-tab" title="Double-clic pour renommer"><span></span></div>';
+    el._name = el.querySelector('.frame-tab span');
+    placeEl(el, f);
+    return el;
+  }
+
   function placeEl(el, it) {
+    if (it.ids) el._name.textContent = it.name;
     el.style.transform = `translate(${it.x}px, ${it.y}px)`;
     el.style.width = `${it.w}px`;
     el.style.height = `${it.h}px`;
-    el.classList.toggle('has-source', !!it.source);
+    if (!it.ids) el.classList.toggle('has-source', !!it.source);
   }
 
   function removeEl(id) {
@@ -163,17 +198,19 @@ const Board = (() => {
 
   // Met le DOM en accord avec board.items (ajouts, suppressions, positions, ordre d'empilement).
   function sync() {
-    const ids = new Set(board.items.map((it) => it.id));
+    const blocks = allBlocks(); // les cadres d'abord : ils restent derrière les médias
+    const ids = new Set(blocks.map((it) => it.id));
     for (const id of [...els.keys()]) if (!ids.has(id)) removeEl(id);
     for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
-    board.items.forEach((it, i) => {
+    for (const f of board.frames) f.ids = f.ids.filter((id) => ids.has(id));
+    blocks.forEach((it, i) => {
       let el = els.get(it.id);
       if (!el) els.set(it.id, (el = makeEl(it)));
       else placeEl(el, it);
       el.classList.toggle('selected', selected.has(it.id));
       if (world.children[i] !== el) world.insertBefore(el, world.children[i] || null);
     });
-    document.getElementById('empty').hidden = board.items.length > 0;
+    document.getElementById('empty').hidden = blocks.length > 0;
     drawOverlay();
     updateInfo();
   }
@@ -311,9 +348,13 @@ const Board = (() => {
 
   function drawOverlay() {
     scheduleMedia();
-    const b = board && bounds(selItems());
+    const sel = board ? selBlocks() : [];
+    const b = bounds(sel);
     selBox.hidden = !b;
     if (!b) return;
+    // Poignées : un seul cadre (sa largeur), ou des médias libres. Un média dans un cadre suit le rangement du cadre.
+    const onlyFrame = sel.length === 1 && sel[0].ids;
+    selBox.classList.toggle('no-handles', !onlyFrame && sel.some((it) => it.ids || frameOfItem(it.id)));
     selBox.style.left = `${b.x * view.s + view.x}px`;
     selBox.style.top = `${b.y * view.s + view.y}px`;
     selBox.style.width = `${b.w * view.s}px`;
@@ -324,6 +365,8 @@ const Board = (() => {
     if (!board) return;
     const n = board.items.length;
     const parts = [`${n} média${n > 1 ? 's' : ''}`];
+    const nf = board.frames.length;
+    if (nf) parts.push(`${nf} cadre${nf > 1 ? 's' : ''}`);
     if (selected.size) parts.push(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`);
     document.getElementById('info').textContent = parts.join(' · ');
     api.onSelection(selected.size);
@@ -365,13 +408,20 @@ const Board = (() => {
 
   function startMove(e, clickedId) {
     const start = toWorld(e.clientX, e.clientY);
-    const orig = selItems().map((it) => ({ it, x: it.x, y: it.y }));
+    const moving = selFrames();
+    const children = new Set(moving.flatMap((f) => f.ids));
+    const loose = selItems().filter((it) => !children.has(it.id));
+    const objs = [...moving, ...board.items.filter((it) => children.has(it.id)), ...loose];
+    const orig = objs.map((it) => ({ it, x: it.x, y: it.y }));
     let moved = false;
     drag(
       e,
       (ev) => {
         if (!moved && !movedEnough(e, ev)) return;
-        if (!moved) checkpoint();
+        if (!moved) {
+          checkpoint();
+          for (const it of loose) els.get(it.id).classList.add('dragging');
+        }
         moved = true;
         const p = toWorld(ev.clientX, ev.clientY);
         for (const o of orig) {
@@ -379,18 +429,165 @@ const Board = (() => {
           o.it.y = o.y + p.y - start.y;
           placeEl(els.get(o.it.id), o.it);
         }
+        if (!moving.length) showDropTarget(p, loose);
         drawOverlay();
       },
-      () => {
-        if (moved) changed();
-        else if (!e.shiftKey) setSelection([clickedId]); // simple clic dans une sélection : on ne garde que ce média
+      (ev) => {
+        if (moved) {
+          showDropTarget(null);
+          for (const it of loose) els.get(it.id).classList.remove('dragging');
+          const p = toWorld(ev.clientX, ev.clientY);
+          dropItems(loose, moving.length ? null : frameAt(p), p);
+          changed();
+        } else if (!e.shiftKey) setSelection([clickedId]); // simple clic dans une sélection : on ne garde que ce média
       }
     );
+  }
+
+  // ---------- Cadres ----------
+
+  function frameAt(p) {
+    const edge = FRAME_EDGE / view.s;
+    return board.frames.findLast(
+      (f) => p.x >= f.x - edge && p.x <= f.x + f.w + edge && p.y >= f.y - edge && p.y <= f.y + f.h + edge
+    );
+  }
+
+  // Range les médias d'un cadre : sa largeur est fixe, sa hauteur suit le contenu.
+  function flowFrame(f) {
+    const list = f.ids.map(byId).filter(Boolean);
+    const { mode, rowHeight: height, gap } = f.layout;
+    const x = f.x + FRAME_PAD;
+    const y = f.y + FRAME_PAD;
+    const width = f.w - 2 * FRAME_PAD;
+    const placed =
+      mode === 'grid'
+        ? Layout.grid(list, { x, y, gap, cell: height, cols: Math.max(1, Math.floor((width + gap) / (height + gap))) })
+        : Layout.justifiedRows(list, { x, y, width, height, gap });
+    for (const it of list) Object.assign(it, placed.get(it.id));
+    const b = bounds(list);
+    f.h = b ? b.y + b.h - f.y + FRAME_PAD : FRAME_MIN_H;
+  }
+
+  // Rang d'insertion d'après le point visé, en suivant l'ordre de lecture du cadre.
+  function insertIndex(f, p, skip = new Set()) {
+    const list = f.ids.filter((id) => !skip.has(id)).map(byId);
+    const i = list.findIndex((it) => p.y < it.y || (p.y <= it.y + it.h && p.x < it.x + it.w / 2));
+    return i < 0 ? list.length : i;
+  }
+
+  // Pendant le glisser : le cadre visé s'allume, un trait montre où les médias vont s'insérer.
+  function showDropTarget(p, loose = []) {
+    const target = p && frameAt(p);
+    for (const f of board.frames) els.get(f.id).classList.toggle('drop-target', f === target);
+    dropMark.hidden = !target;
+    if (!target) return;
+    const skip = new Set(loose.map((it) => it.id));
+    const list = target.ids.filter((id) => !skip.has(id)).map(byId);
+    const i = insertIndex(target, p, skip);
+    const prev = list[i - 1];
+    const next = list[i];
+    const after = prev && (!next || p.y <= prev.y + prev.h);
+    const ref = after ? prev : next;
+    dropMark.hidden = !ref;
+    if (!ref) return;
+    const half = target.layout.gap / 2;
+    const x = after ? ref.x + ref.w + half : ref.x - half;
+    dropMark.style.left = `${x * view.s + view.x - 2}px`;
+    dropMark.style.top = `${ref.y * view.s + view.y}px`;
+    dropMark.style.height = `${ref.h * view.s}px`;
+  }
+
+  // Sort les médias de leurs cadres, les insère dans target s'il y en a un, et réorganise les cadres touchés.
+  function dropItems(loose, target, p) {
+    const ids = new Set(loose.map((it) => it.id));
+    const touched = new Set();
+    for (const f of board.frames) {
+      if (!f.ids.some((id) => ids.has(id))) continue;
+      f.ids = f.ids.filter((id) => !ids.has(id));
+      touched.add(f);
+    }
+    if (target && loose.length) {
+      target.ids.splice(insertIndex(target, p), 0, ...Layout.readingOrder(loose).map((it) => it.id));
+      touched.add(target);
+    }
+    if (!touched.size) return;
+    touched.forEach(flowFrame);
+    animate();
+  }
+
+  function createFrame() {
+    const list = Layout.readingOrder(selItems());
+    const layout = { mode: settings.mode, rowHeight: +settings.rowHeight || 300, gap: Math.max(0, +settings.gap || 0) };
+    const b = bounds(list);
+    const at = b ? { x: b.x - FRAME_PAD, y: b.y - FRAME_PAD } : dropPoint();
+    const f = {
+      id: uid(), name: 'Nouveau cadre', ...at,
+      w: list.length ? Layout.autoWidth(list, layout.rowHeight, layout.gap) + 2 * FRAME_PAD : 1200,
+      h: FRAME_MIN_H, ids: [], layout, added: new Date().toISOString(),
+    };
+    checkpoint();
+    board.frames.push(f);
+    dropItems(list, f, { x: Infinity, y: Infinity });
+    selected.clear();
+    selected.add(f.id);
+    changed();
+    renameFrame(f.id);
+  }
+
+  function renameFrame(id) {
+    const f = frameById(id);
+    const el = els.get(id);
+    const tab = el?.querySelector('.frame-tab');
+    if (!tab || tab.querySelector('input')) return;
+    const input = document.createElement('input');
+    input.value = f.name;
+    tab.replaceChildren(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      endRename = null;
+      const name = input.value.trim();
+      if (save && name && name !== f.name) {
+        checkpoint();
+        f.name = name;
+        el._name.textContent = name;
+        api.onChange(true);
+      }
+      tab.replaceChildren(el._name);
+    };
+    endRename = () => finish(true);
+    input.addEventListener('blur', endRename);
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      if (e.key === 'Escape') finish(false);
+    });
+  }
+
+  // Sort les médias sélectionnés de leur cadre : ils se posent à sa droite.
+  function ejectSelected() {
+    const list = Layout.readingOrder(selItems().filter((it) => frameOfItem(it.id)));
+    if (!list.length) return;
+    checkpoint();
+    const f = frameOfItem(list[0].id);
+    let y = f.y;
+    for (const it of list) {
+      it.x = f.x + f.w + FRAME_GAP;
+      it.y = y;
+      y += it.h + FRAME_PAD;
+    }
+    dropItems(list, null);
+    changed();
   }
 
   function startRubber(e) {
     const base = e.shiftKey ? [...selected] : [];
     const a = toWorld(e.clientX, e.clientY);
+    const inside = frameAt(a); // parti de l'intérieur d'un cadre : on ne sélectionne que ses médias
     const r = stage.getBoundingClientRect();
     let moved = false;
     drag(
@@ -407,7 +604,10 @@ const Board = (() => {
           height: `${Math.abs(ev.clientY - e.clientY)}px`,
         });
         rubber.hidden = false;
-        setSelection([...base, ...board.items.filter((it) => intersects(rect, it)).map((it) => it.id)]);
+        const hit = inside
+          ? inside.ids.map(byId).filter((it) => intersects(rect, it))
+          : [...board.frames.filter((f) => encloses(rect, f)), ...freeItems().filter((it) => intersects(rect, it))];
+        setSelection([...base, ...hit.map((it) => it.id)]);
       },
       () => {
         rubber.hidden = true;
@@ -418,6 +618,7 @@ const Board = (() => {
 
   // Redimensionne la sélection entière depuis un coin, le coin opposé restant fixe.
   function startResize(e, corner) {
+    if (selected.size === 1 && selFrames().length) return resizeFrame(e, selFrames()[0], corner);
     const items = selItems();
     const b = bounds(items);
     const ax = corner.includes('w') ? b.x + b.w : b.x;
@@ -441,15 +642,38 @@ const Board = (() => {
     );
   }
 
+  // Un cadre se redimensionne en largeur : ses médias se réorganisent et sa hauteur suit.
+  function resizeFrame(e, f, corner) {
+    const right = f.x + f.w;
+    const west = corner.includes('w');
+    let started = false;
+    drag(
+      e,
+      (ev) => {
+        if (!started) checkpoint();
+        started = true;
+        const p = toWorld(ev.clientX, ev.clientY);
+        f.w = Math.max(FRAME_MIN_W, west ? right - p.x : p.x - f.x);
+        if (west) f.x = right - f.w;
+        flowFrame(f);
+        placeEl(els.get(f.id), f);
+        for (const id of f.ids) placeEl(els.get(id), byId(id));
+        drawOverlay();
+      },
+      () => started && changed()
+    );
+  }
+
   stage.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault()); // pas de défilement auto au clic molette
 
   stage.addEventListener('pointerdown', (e) => {
-    if (!board || e.target.closest('.tools button')) return;
+    if (!board || e.target.closest('.tools button, .frame-tab input')) return;
+    endRename?.();
     if (e.button === 1 || (e.button === 0 && spaceDown)) return startPan(e);
     if (e.button !== 0) return;
     const handle = e.target.closest('.handle');
     if (handle) return startResize(e, handle.dataset.corner);
-    const el = e.target.closest('.item');
+    const el = e.target.closest('.item, .frame');
     if (!el) return startRubber(e);
     const id = el.dataset.id;
     if (e.shiftKey && selected.has(id)) {
@@ -481,6 +705,12 @@ const Board = (() => {
 
   // Double-clic sur un média : il remplit l'écran.
   stage.addEventListener('dblclick', (e) => {
+    const frameEl = e.target.closest('.frame');
+    if (frameEl) {
+      if (e.target.closest('.frame-tab')) renameFrame(frameEl.dataset.id);
+      else zoomToRect(frameById(frameEl.dataset.id)); // double-clic sur le bord : le cadre remplit l'écran
+      return;
+    }
     const el = e.target.closest('.item');
     if (!el || e.target.closest('.tools')) return;
     const it = byId(el.dataset.id);
@@ -506,7 +736,7 @@ const Board = (() => {
   // ---------- Modifications (avec annulation) ----------
 
   function checkpoint() {
-    undoStack.push(JSON.stringify(board.items));
+    undoStack.push(snapshot());
     if (undoStack.length > 100) undoStack.shift();
     redoStack.length = 0;
   }
@@ -516,10 +746,12 @@ const Board = (() => {
     api.onChange(true);
   }
 
+  const snapshot = () => JSON.stringify({ items: board.items, frames: board.frames });
+
   function restore(from, to) {
     if (!from.length) return;
-    to.push(JSON.stringify(board.items));
-    board.items = JSON.parse(from.pop());
+    to.push(snapshot());
+    Object.assign(board, JSON.parse(from.pop()));
     changed();
   }
 
@@ -538,40 +770,86 @@ const Board = (() => {
     changed();
   }
 
-  // Médias visés par une commande : la sélection, ou toute la planche si rien (ou un seul) n'est sélectionné.
-  const targets = (min = 2) => (selected.size >= min ? selItems() : board.items);
-
   function ordered(items, order) {
     if (order === 'added') return [...items].sort((a, b) => a.added.localeCompare(b.added));
     if (order === 'type') {
       const rank = { video: 0, gif: 1, image: 2 };
-      return [...items].sort((a, b) => rank[a.type] - rank[b.type] || a.added.localeCompare(b.added));
+      const of = (it) => rank[it.type] ?? 3;
+      return [...items].sort((a, b) => of(a) - of(b) || a.added.localeCompare(b.added));
     }
     return Layout.readingOrder(items);
   }
 
+  // Réorganise l'intérieur de cadres ; layoutOf donne les réglages de chacun.
+  function reflowFrames(list, layoutOf, order) {
+    checkpoint();
+    for (const f of list) {
+      f.layout = layoutOf(f);
+      if (order) f.ids = ordered(f.ids.map(byId), order).map((it) => it.id);
+      flowFrame(f);
+    }
+    animate();
+    changed();
+  }
+
+  // Cadres et médias libres rangés comme des blocs : les cadres gardent leur taille et leur contenu suit.
+  function arrangeBlocks(blocks, opts, gap) {
+    const b = bounds(blocks);
+    const space = Math.max(gap, FRAME_GAP, 70 / view.s); // onglet et bords gardent leur taille à l'écran quel que soit le zoom
+    const placed = Layout.shelves(ordered(blocks, opts.order), {
+      x: b.x, y: b.y, gap: space,
+      width: +opts.width || Layout.shelfWidth(blocks, space),
+      cols: opts.mode === 'grid' ? +opts.cols || 0 : 0,
+    });
+    checkpoint();
+    for (const it of blocks) {
+      const p = placed.get(it.id);
+      for (const id of it.ids || []) {
+        byId(id).x += p.x - it.x;
+        byId(id).y += p.y - it.y;
+      }
+      Object.assign(it, p);
+    }
+    animate();
+    changed();
+  }
+
   function arrange(opts) {
-    const items = targets();
-    if (!items.length) return;
-    const b = bounds(items);
-    const list = ordered(items, opts.order);
     const height = +opts.rowHeight || 300;
     const gap = Math.max(0, +opts.gap || 0);
-    const placed =
-      opts.mode === 'grid'
-        ? Layout.grid(list, { x: b.x, y: b.y, cell: height, gap, cols: +opts.cols || Layout.autoCols(list.length) })
-        : Layout.justifiedRows(list, {
-            x: b.x, y: b.y, height, gap,
-            width: +opts.width || Layout.autoWidth(list, height, gap),
-          });
-    applyPlacement(placed);
-    if (items === board.items) zoomToRect(bounds(board.items));
+    const whole = selected.size < 2 && !selFrames().length;
+    const isFree = (it) => it.ids || !frameOfItem(it.id);
+    // Un seul cadre, ou seulement des médias de cadres : on range l'intérieur.
+    if (!whole && selFrames().length <= 1 && !selItems().some(isFree)) {
+      const list = selFrames().length ? selFrames() : framesOfSelection();
+      if (list.length) reflowFrames(list, () => ({ mode: opts.mode, rowHeight: height, gap }), opts.order);
+      return;
+    }
+    const blocks = whole ? [...board.frames, ...freeItems()] : selBlocks().filter(isFree);
+    if (!blocks.length) return;
+    if (blocks.some((it) => it.ids)) arrangeBlocks(blocks, opts, gap);
+    else {
+      const b = bounds(blocks);
+      const list = ordered(blocks, opts.order);
+      const placed =
+        opts.mode === 'grid'
+          ? Layout.grid(list, { x: b.x, y: b.y, cell: height, gap, cols: +opts.cols || Layout.autoCols(list.length) })
+          : Layout.justifiedRows(list, {
+              x: b.x, y: b.y, height, gap,
+              width: +opts.width || Layout.autoWidth(list, height, gap),
+            });
+      applyPlacement(placed);
+    }
+    if (whole) zoomToRect(bounds(allBlocks()));
   }
 
   // Même hauteur (ou même largeur) pour tous, proportions gardées, coin haut-gauche fixe.
+  // Dans un cadre, c'est la hauteur des lignes du cadre qui change.
   function uniform(dim, size) {
-    const items = targets(1);
-    if (!items.length || !(size > 0)) return;
+    if (!(size > 0)) return;
+    const list = [...new Set([...selFrames(), ...framesOfSelection()])];
+    const items = (selected.size ? selItems() : freeItems()).filter((it) => !frameOfItem(it.id));
+    if (!items.length) return list.length && reflowFrames(list, (f) => ({ ...f.layout, rowHeight: size }));
     const placed = new Map();
     for (const it of items) {
       const r = it.w / it.h;
@@ -581,7 +859,7 @@ const Board = (() => {
   }
 
   // Place les nouveaux médias en lignes, centrées sur le point visé.
-  function addItems(items, at) {
+  function addItems(items, at, intoFrame = true) {
     if (!items.length) return;
     for (const it of items) {
       it.h = NEW_HEIGHT;
@@ -599,6 +877,8 @@ const Board = (() => {
     }
     checkpoint();
     board.items.push(...items);
+    const target = intoFrame && frameAt(at); // déposés sur un cadre : ils y entrent
+    if (target) dropItems(items, target, at);
     selected.clear();
     for (const it of items) selected.add(it.id);
     changed();
@@ -607,7 +887,14 @@ const Board = (() => {
   function deleteSelected() {
     if (!selected.size) return;
     checkpoint();
+    const touched = framesOfSelection().filter((f) => !selected.has(f.id));
+    // Supprimer un cadre garde ses médias : ils redeviennent libres.
+    board.frames = board.frames.filter((f) => !selected.has(f.id));
     board.items = board.items.filter((it) => !selected.has(it.id));
+    for (const f of touched) {
+      f.ids = f.ids.filter((id) => !selected.has(id));
+      flowFrame(f);
+    }
     changed();
   }
 
@@ -617,6 +904,9 @@ const Board = (() => {
     const sel = selItems();
     const rest = board.items.filter((it) => !selected.has(it.id));
     board.items = front ? [...rest, ...sel] : [...sel, ...rest];
+    const selF = selFrames();
+    const restF = board.frames.filter((f) => !selected.has(f.id));
+    board.frames = front ? [...restF, ...selF] : [...selF, ...restF];
     changed();
   }
 
@@ -633,11 +923,12 @@ const Board = (() => {
     undoStack.length = 0;
     redoStack.length = 0;
     board = b;
+    board.frames ??= []; // planches créées avant l'arrivée des cadres
     sync();
     if (b.view) {
       Object.assign(view, b.view);
       applyView();
-    } else zoomToRect(bounds(b.items));
+    } else zoomToRect(bounds(allBlocks()));
   }
 
   // Point du canevas où déposer un collage : sous la souris, sinon au centre de l'écran.
@@ -648,15 +939,20 @@ const Board = (() => {
   }
 
   return Object.assign(api, {
-    load, addItems, deleteSelected, arrange, uniform, setSource, toWorld, dropPoint,
+    load, addItems, deleteSelected, arrange, uniform, setSource, toWorld, dropPoint, createFrame, renameFrame, ejectSelected,
     undo: () => restore(undoStack, redoStack),
     redo: () => restore(redoStack, undoStack),
     bringToFront: () => restack(true),
     sendToBack: () => restack(false),
-    selectAll: () => setSelection(board.items.map((it) => it.id)),
+    selectAll: () => setSelection([...board.frames, ...freeItems()].map((it) => it.id)),
     clearSelection: () => setSelection([]),
     select: (id) => !selected.has(id) && setSelection([id]),
     selectedItems: () => selItems(),
+    inFrame: (id) => !!frameOfItem(id),
+    frameOf: (target) => {
+      const el = target.closest?.('.frame');
+      return el ? frameById(el.dataset.id) : null;
+    },
     itemOf: (target) => {
       const el = target.closest?.('.item');
       return el ? byId(el.dataset.id) : null;
@@ -668,8 +964,8 @@ const Board = (() => {
     },
     zoomBy,
     zoomReset: () => zoomBy(1 / view.s),
-    fitAll: () => zoomToRect(bounds(board.items)),
-    fitSelection: () => zoomToRect(bounds(selItems()) || bounds(board.items)),
+    fitAll: () => zoomToRect(bounds(allBlocks())),
+    fitSelection: () => zoomToRect(bounds(selBlocks()) || bounds(allBlocks())),
     selectionSize: () => selected.size,
   });
 })();

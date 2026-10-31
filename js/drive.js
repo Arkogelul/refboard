@@ -11,8 +11,11 @@ const Drive = (() => {
   const SMALL = 5 * 1024 * 1024; // au-delà : envoi « reprenable », adapté aux grosses vidéos
 
   // Le jeton d'accès dure une heure ; on le garde pour ne pas se reconnecter à chaque rechargement.
+  // Quand il expire, l'extension « Vers RefBoard » en redemande un sans aucune fenêtre (voir refresh).
   let auth = readJSON('refboard.auth');
   let tokenClient = null;
+  let account = localStorage.getItem('refboard.account') || ''; // adresse du compte : évite le choix du compte
+  let refreshing = null;
 
   class AuthNeeded extends Error {}
 
@@ -40,19 +43,58 @@ const Drive = (() => {
       };
       tokenClient.error_callback = (e) =>
         ko(new AuthNeeded(e.type === 'popup_closed' ? 'Connexion annulée' : 'Fenêtre de connexion Google bloquée'));
-      tokenClient.requestAccessToken({ prompt: '' });
+      tokenClient.requestAccessToken({ prompt: '', login_hint: account || undefined });
     });
+  }
+
+  // Demande un nouveau jeton à l'extension, sans fenêtre ni clic. Renvoie true si on en a obtenu un.
+  function refresh() {
+    refreshing ??= silentToken().finally(() => (refreshing = null));
+    return refreshing;
+  }
+
+  async function silentToken() {
+    // Le script de l'extension peut se charger un peu après la page.
+    for (let i = 0; i < 15 && !document.documentElement.dataset.refboardExtension; i++) await sleep(100);
+    if (parseFloat(document.documentElement.dataset.refboardExtension) < 2.2 || !document.documentElement.dataset.refboardExtension) return false;
+    const id = Math.random().toString(36).slice(2);
+    const r = await new Promise((ok) => {
+      const timer = setTimeout(() => done(), 15000);
+      const done = (res) => {
+        clearTimeout(timer);
+        removeEventListener('message', listen);
+        ok(res);
+      };
+      const listen = (e) => {
+        if (e.source === window && e.data?.refboard === 'token-result' && e.data.id === id) done(e.data);
+      };
+      addEventListener('message', listen);
+      window.postMessage({ refboard: 'token', id, hint: account }, location.origin);
+    });
+    if (!r?.token || !SCOPES.every((s) => r.scope?.includes(s))) return false;
+    auth = { token: r.token, exp: Date.now() + r.expiresIn * 1000, scope: r.scope };
+    remember('refboard.auth', auth);
+    return true;
+  }
+
+  // Mémorise le compte connecté, pour ne plus avoir à le choisir (utile si plusieurs comptes Google sont ouverts).
+  async function rememberAccount() {
+    const j = await (await request('/about?fields=user(emailAddress)')).json();
+    account = j.user?.emailAddress || '';
+    if (account) localStorage.setItem('refboard.account', account);
   }
 
   function signOut() {
     if (auth.token) window.google?.accounts?.oauth2?.revoke(auth.token, () => {});
     auth = {};
     remember('refboard.auth', auth);
+    account = '';
+    localStorage.removeItem('refboard.account');
   }
 
   // Appel authentifié, avec nouvelles tentatives si Google est surchargé.
   async function request(url, opts = {}, attempt = 0) {
-    if (!hasToken()) throw new AuthNeeded('Reconnexion à Google Drive nécessaire');
+    if (!hasToken() && !(await refresh())) throw new AuthNeeded('Reconnexion à Google Drive nécessaire');
     const r = await fetch(url.startsWith('http') ? url : API + url, {
       ...opts,
       headers: { ...opts.headers, Authorization: `Bearer ${auth.token}` },
@@ -62,6 +104,7 @@ const Drive = (() => {
     if (r.status === 401 || insufficient) {
       auth = {};
       remember('refboard.auth', auth);
+      if (!opts.retried && (await refresh())) return request(url, { ...opts, retried: true }, attempt);
       throw new AuthNeeded('Session Google expirée');
     }
     const rateLimited =
@@ -133,5 +176,5 @@ const Drive = (() => {
     return r.json();
   }
 
-  return { AuthNeeded, hasToken, signIn, signOut, list, get, download, trash, remove, legacyFolders, upload, update };
+  return { AuthNeeded, hasToken, signIn, signOut, refresh, rememberAccount, list, get, download, trash, remove, legacyFolders, upload, update };
 })();
