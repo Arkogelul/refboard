@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Icone de RefBoard : un cadre a onglet qui contient des vignettes. -->
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="#2b2b2b" stroke="#3a3a3a" stroke-width="4"/>
+  <!-- cadre et onglet, d'un seul trait -->
+  <path d="M52 92 V68 a12 12 0 0 1 12 -12 h44 a12 12 0 0 1 12 12 v10 h72 a12 12 0 0 1 12 12 v98 a12 12 0 0 1 -12 12 H64 a12 12 0 0 1 -12 -12 Z"
+        fill="none" stroke="#3794ff" stroke-width="14" stroke-linejoin="round"/>
+  <!-- vignettes -->
+  <rect x="74" y="100" width="62" height="38" rx="6" fill="#e0e0e0"/>
+  <rect x="146" y="100" width="36" height="38" rx="6" fill="#3794ff"/>
+  <rect x="74" y="148" width="36" height="32" rx="6" fill="#3794ff"/>
+  <rect x="120" y="148" width="62" height="32" rx="6" fill="#e0e0e0"/>
+</svg>

@@ -7,6 +7,7 @@ const Board = (() => {
   const selBox = document.getElementById('selBox');
   const rubber = document.getElementById('rubber');
   const dropMark = document.getElementById('dropMark');
+  const palette = document.getElementById('framePalette');
 
   const MIN_ZOOM = 0.02;
   const MAX_ZOOM = 8;
@@ -16,6 +17,15 @@ const Board = (() => {
   const FRAME_MIN_H = 160;
   const FRAME_GAP = 120; // écart minimal entre cadres rangés (laisse la place aux bords et aux onglets)
   const FRAME_EDGE = 14; // épaisseur du bord attrapable, en pixels à l'écran
+  // Palette des cadres : 10 familles (colonnes) en 5 tons sourds (lignes), du plus sombre au plus clair.
+  const FRAME_COLORS = [
+    '#343a46', '#4d2d33', '#4d352d', '#4d402d', '#4a4b30', '#374931', '#304b44', '#2d414d', '#30304b', '#46304a',
+    '#424b5c', '#67373f', '#674237', '#675437', '#62633b', '#46613d', '#3b6359', '#375567', '#3b3b63', '#5c3c62',
+    '#505b72', '#80424c', '#805042', '#806742', '#797b47', '#55784a', '#477b6e', '#426880', '#47477b', '#71487a',
+    '#5f6c87', '#974e5a', '#975f4e', '#977a4e', '#909254', '#658e57', '#549282', '#4e7b97', '#545492', '#865590',
+    '#727e97', '#a7626e', '#a77262', '#a78b62', '#a0a267', '#789e6b', '#67a293', '#628da7', '#6767a2', '#9769a0',
+  ];
+  const FRAME_DEFAULT_COLOR = FRAME_COLORS[20]; // gris bleuté, ton moyen
 
   const view = { x: 0, y: 0, s: 1 }; // écran = canevas × s + (x, y)
   const els = new Map(); // id -> élément DOM
@@ -174,16 +184,21 @@ const Board = (() => {
     el.className = 'frame';
     el.dataset.id = f.id;
     el.innerHTML =
+      '<div class="frame-line"></div><div class="frame-ring"></div><div class="frame-corner"></div>' +
       '<div class="frame-edge top"></div><div class="frame-edge right"></div>' +
       '<div class="frame-edge bottom"></div><div class="frame-edge left"></div>' +
-      '<div class="frame-tab" title="Double-clic pour renommer"><span></span></div>';
+      '<div class="frame-tab" title="Double-clic pour renommer"><span></span></div>' +
+      '<div class="frame-grip" title="Changer la largeur"></div>';
     el._name = el.querySelector('.frame-tab span');
     placeEl(el, f);
     return el;
   }
 
   function placeEl(el, it) {
-    if (it.ids) el._name.textContent = it.name;
+    if (it.ids) {
+      el._name.textContent = it.name;
+      el.style.setProperty('--frame', it.color || FRAME_DEFAULT_COLOR);
+    }
     el.style.transform = `translate(${it.x}px, ${it.y}px)`;
     el.style.width = `${it.w}px`;
     el.style.height = `${it.h}px`;
@@ -350,11 +365,11 @@ const Board = (() => {
     scheduleMedia();
     const sel = board ? selBlocks() : [];
     const b = bounds(sel);
-    selBox.hidden = !b;
-    if (!b) return;
-    // Poignées : un seul cadre (sa largeur), ou des médias libres. Un média dans un cadre suit le rangement du cadre.
-    const onlyFrame = sel.length === 1 && sel[0].ids;
-    selBox.classList.toggle('no-handles', !onlyFrame && sel.some((it) => it.ids || frameOfItem(it.id)));
+    // Un cadre sélectionné a son propre contour : pas de rectangle de sélection autour.
+    selBox.hidden = !b || sel.every((it) => it.ids);
+    if (selBox.hidden) return;
+    // Poignées : seulement pour des médias libres. Un média dans un cadre suit le rangement du cadre.
+    selBox.classList.toggle('no-handles', sel.some((it) => it.ids || frameOfItem(it.id)));
     selBox.style.left = `${b.x * view.s + view.x}px`;
     selBox.style.top = `${b.y * view.s + view.y}px`;
     selBox.style.width = `${b.w * view.s}px`;
@@ -525,6 +540,7 @@ const Board = (() => {
       id: uid(), name: 'Nouveau cadre', ...at,
       w: list.length ? Layout.autoWidth(list, layout.rowHeight, layout.gap) + 2 * FRAME_PAD : 1200,
       h: FRAME_MIN_H, ids: [], layout, added: new Date().toISOString(),
+      color: settings.frameColor || FRAME_DEFAULT_COLOR, // un nouveau cadre reprend la dernière couleur choisie
     };
     checkpoint();
     board.frames.push(f);
@@ -542,7 +558,12 @@ const Board = (() => {
     if (!tab || tab.querySelector('input')) return;
     const input = document.createElement('input');
     input.value = f.name;
-    tab.replaceChildren(input);
+    const dot = document.createElement('button');
+    dot.className = 'frame-dot';
+    dot.title = 'Couleur du cadre';
+    dot.onclick = () => togglePalette(f, dot, input);
+    dot.onmousedown = (e) => e.preventDefault(); // garde le champ actif
+    tab.replaceChildren(input, dot);
     input.focus();
     input.select();
     let done = false;
@@ -550,6 +571,7 @@ const Board = (() => {
       if (done) return;
       done = true;
       endRename = null;
+      palette.hidden = true;
       const name = input.value.trim();
       if (save && name && name !== f.name) {
         checkpoint();
@@ -566,6 +588,33 @@ const Board = (() => {
       if (e.key === 'Enter') finish(true);
       if (e.key === 'Escape') finish(false);
     });
+  }
+
+  // Palette de couleurs, ouverte depuis la pastille de l'onglet pendant le renommage.
+  function togglePalette(f, dot, input) {
+    if (!palette.hidden) return (palette.hidden = true);
+    palette.replaceChildren(
+      ...FRAME_COLORS.map((color) => {
+        const b = document.createElement('button');
+        b.style.background = color;
+        b.classList.toggle('current', color === (f.color || FRAME_DEFAULT_COLOR));
+        b.onclick = () => {
+          checkpoint();
+          f.color = color;
+          settings.frameColor = color;
+          remember('refboard.settings', settings);
+          placeEl(els.get(f.id), f);
+          api.onChange(true);
+          palette.hidden = true;
+          input.focus();
+        };
+        return b;
+      })
+    );
+    palette.hidden = false;
+    const r = dot.getBoundingClientRect();
+    palette.style.left = `${Math.min(r.left, innerWidth - palette.offsetWidth - 8)}px`;
+    palette.style.top = `${Math.min(r.bottom + 6, innerHeight - palette.offsetHeight - 8)}px`;
   }
 
   // Sort les médias sélectionnés de leur cadre : ils se posent à sa droite.
@@ -618,7 +667,6 @@ const Board = (() => {
 
   // Redimensionne la sélection entière depuis un coin, le coin opposé restant fixe.
   function startResize(e, corner) {
-    if (selected.size === 1 && selFrames().length) return resizeFrame(e, selFrames()[0], corner);
     const items = selItems();
     const b = bounds(items);
     const ax = corner.includes('w') ? b.x + b.w : b.x;
@@ -643,9 +691,7 @@ const Board = (() => {
   }
 
   // Un cadre se redimensionne en largeur : ses médias se réorganisent et sa hauteur suit.
-  function resizeFrame(e, f, corner) {
-    const right = f.x + f.w;
-    const west = corner.includes('w');
+  function resizeFrame(e, f) {
     let started = false;
     drag(
       e,
@@ -653,8 +699,7 @@ const Board = (() => {
         if (!started) checkpoint();
         started = true;
         const p = toWorld(ev.clientX, ev.clientY);
-        f.w = Math.max(FRAME_MIN_W, west ? right - p.x : p.x - f.x);
-        if (west) f.x = right - f.w;
+        f.w = Math.max(FRAME_MIN_W, p.x - f.x);
         flowFrame(f);
         placeEl(els.get(f.id), f);
         for (const id of f.ids) placeEl(els.get(id), byId(id));
@@ -667,12 +712,17 @@ const Board = (() => {
   stage.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault()); // pas de défilement auto au clic molette
 
   stage.addEventListener('pointerdown', (e) => {
-    if (!board || e.target.closest('.tools button, .frame-tab input')) return;
+    if (!board || e.target.closest('.tools button, .frame-tab input, .frame-dot')) return;
     endRename?.();
     if (e.button === 1 || (e.button === 0 && spaceDown)) return startPan(e);
     if (e.button !== 0) return;
     const handle = e.target.closest('.handle');
     if (handle) return startResize(e, handle.dataset.corner);
+    if (e.target.closest('.frame-grip')) {
+      const id = e.target.closest('.frame').dataset.id;
+      setSelection([id]);
+      return resizeFrame(e, frameById(id));
+    }
     const el = e.target.closest('.item, .frame');
     if (!el) return startRubber(e);
     const id = el.dataset.id;

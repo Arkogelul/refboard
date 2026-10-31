@@ -4,10 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RefBoard</title>
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
   <header id="toolbar">
+    <img class="logo-icon" src="assets/icon.svg" alt="">
     <span class="logo">RefBoard</span>
     <select id="boardSelect" title="Changer de planche"></select>
     <button id="boardNew" class="icon" title="Nouvelle planche">＋</button>
@@ -98,16 +100,17 @@
   </form>
 
   <div id="menu" class="menu" hidden></div>
+  <div id="framePalette" hidden onmousedown="event.preventDefault()"></div>
   <div id="toast"></div>
 
   <script src="https://accounts.google.com/gsi/client" async></script>
-  <script src="js/config.js?v=7"></script>
-  <script src="js/db.js?v=7"></script>
-  <script src="js/layout.js?v=7"></script>
-  <script src="js/media.js?v=7"></script>
-  <script src="js/drive.js?v=7"></script>
-  <script src="js/board.js?v=7"></script>
-  <script src="js/sync.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/config.js?v=8"></script>
+  <script src="js/db.js?v=8"></script>
+  <script src="js/layout.js?v=8"></script>
+  <script src="js/media.js?v=8"></script>
+  <script src="js/drive.js?v=8"></script>
+  <script src="js/board.js?v=8"></script>
+  <script src="js/sync.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>
