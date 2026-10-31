@@ -17,15 +17,14 @@ const Board = (() => {
   const FRAME_MIN_H = 160;
   const FRAME_GAP = 120; // écart minimal entre cadres rangés (laisse la place aux bords et aux onglets)
   const FRAME_EDGE = 14; // épaisseur du bord attrapable, en pixels à l'écran
-  // Palette des cadres : 10 familles (colonnes) en 5 tons sourds (lignes), du plus sombre au plus clair.
+  // Palette des cadres : des teintes sourdes mais bien distinctes les unes des autres.
   const FRAME_COLORS = [
-    '#343a46', '#4d2d33', '#4d352d', '#4d402d', '#4a4b30', '#374931', '#304b44', '#2d414d', '#30304b', '#46304a',
-    '#424b5c', '#67373f', '#674237', '#675437', '#62633b', '#46613d', '#3b6359', '#375567', '#3b3b63', '#5c3c62',
-    '#505b72', '#80424c', '#805042', '#806742', '#797b47', '#55784a', '#477b6e', '#426880', '#47477b', '#71487a',
-    '#5f6c87', '#974e5a', '#975f4e', '#977a4e', '#909254', '#658e57', '#549282', '#4e7b97', '#545492', '#865590',
-    '#727e97', '#a7626e', '#a77262', '#a78b62', '#a0a267', '#789e6b', '#67a293', '#628da7', '#6767a2', '#9769a0',
+    '#505b72', '#8f4650', '#96603f', '#8f7a3a', '#6f7d3a', '#4a7d4f',
+    '#3f7f73', '#3f7a8f', '#44639a', '#60509a', '#8a4a8f', '#a0527c',
   ];
-  const FRAME_DEFAULT_COLOR = FRAME_COLORS[20]; // gris bleuté, ton moyen
+  const FRAME_DEFAULT_COLOR = FRAME_COLORS[0];
+  // Bords et onglets des cadres : taille fixe à l'écran jusqu'à 100 %, puis ils rétrécissent moins vite que le canevas.
+  const frameScale = () => Math.max(0.4, Math.min(1, Math.sqrt(view.s)));
 
   const view = { x: 0, y: 0, s: 1 }; // écran = canevas × s + (x, y)
   const els = new Map(); // id -> élément DOM
@@ -76,6 +75,7 @@ const Board = (() => {
   function applyView() {
     world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
     world.style.setProperty('--inv', 1 / view.s);
+    world.style.setProperty('--frame-inv', frameScale() / view.s);
     const step = 32 * view.s; // trame de points qui suit le canevas
     stage.style.backgroundSize = `${step}px ${step}px`;
     stage.style.backgroundPosition = `${view.x}px ${view.y}px`;
@@ -188,7 +188,8 @@ const Board = (() => {
       '<div class="frame-edge top"></div><div class="frame-edge right"></div>' +
       '<div class="frame-edge bottom"></div><div class="frame-edge left"></div>' +
       '<div class="frame-tab" title="Double-clic pour renommer"><span></span></div>' +
-      '<div class="frame-grip" title="Changer la largeur"></div>';
+      '<div class="frame-grip" title="Changer la largeur">' +
+      '<svg viewBox="0 0 30 30"><path d="M23 -6 V8 A15 15 0 0 1 8 23 H-6"/></svg></div>';
     el._name = el.querySelector('.frame-tab span');
     placeEl(el, f);
     return el;
@@ -462,7 +463,7 @@ const Board = (() => {
   // ---------- Cadres ----------
 
   function frameAt(p) {
-    const edge = FRAME_EDGE / view.s;
+    const edge = (FRAME_EDGE * frameScale()) / view.s;
     return board.frames.findLast(
       (f) => p.x >= f.x - edge && p.x <= f.x + f.w + edge && p.y >= f.y - edge && p.y <= f.y + f.h + edge
     );
@@ -693,6 +694,9 @@ const Board = (() => {
   // Un cadre se redimensionne en largeur : ses médias se réorganisent et sa hauteur suit.
   function resizeFrame(e, f) {
     let started = false;
+    const el = els.get(f.id);
+    el.classList.add('resizing'); // la poignée reste visible jusqu'au relâchement
+    document.body.classList.add('resizing-frame');
     drag(
       e,
       (ev) => {
@@ -705,7 +709,11 @@ const Board = (() => {
         for (const id of f.ids) placeEl(els.get(id), byId(id));
         drawOverlay();
       },
-      () => started && changed()
+      () => {
+        el.classList.remove('resizing');
+        document.body.classList.remove('resizing-frame');
+        if (started) changed();
+      }
     );
   }
 
@@ -845,7 +853,7 @@ const Board = (() => {
   // Cadres et médias libres rangés comme des blocs : les cadres gardent leur taille et leur contenu suit.
   function arrangeBlocks(blocks, opts, gap) {
     const b = bounds(blocks);
-    const space = Math.max(gap, FRAME_GAP, 70 / view.s); // onglet et bords gardent leur taille à l'écran quel que soit le zoom
+    const space = Math.max(gap, FRAME_GAP, (70 * frameScale()) / view.s); // place pour l'onglet et les bords, qui ne suivent pas tout à fait le zoom
     const placed = Layout.shelves(ordered(blocks, opts.order), {
       x: b.x, y: b.y, gap: space,
       width: +opts.width || Layout.shelfWidth(blocks, space),

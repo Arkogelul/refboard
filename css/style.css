@@ -51,7 +51,7 @@ body.space #stage { cursor: grab; }
 #stage.panning { cursor: grabbing; }
 body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; }
 
-#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; --inv: 1; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; --inv: 1; --frame-inv: 1; }
 #world.animate .item { transition: transform .4s ease, width .4s ease, height .4s ease; }
 
 .item { position: absolute; left: 0; top: 0; background: #1c1c21; user-select: none; }
@@ -82,7 +82,9 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 /* Cadres : le fond laisse passer les clics, seuls les bords et l'onglet s'attrapent.
    L'anneau, l'onglet et son arrondi forment une seule forme ; --line dessine le contour de sélection autour. */
 .frame {
+  --inv: var(--frame-inv); /* tout le cadre suit cette échelle, qui rétrécit au dézoom */
   --frame: #475166;
+  --bright: hsl(from var(--frame) h calc(s + 30) calc(l + 28));
   --line: transparent;
   --edge: calc(14px * var(--inv));
   --thin: calc(2px * var(--inv));
@@ -91,7 +93,7 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
   position: absolute; left: 0; top: 0; pointer-events: none; border-radius: 0 var(--inner) var(--inner) var(--inner);
   background: color-mix(in srgb, var(--frame) 14%, transparent);
 }
-.frame.selected, .frame.drop-target { --line: hsl(from var(--frame) h calc(s + 35) calc(l + 16)); }
+.frame.selected, .frame.drop-target { --line: var(--bright); }
 .frame.drop-target { background: color-mix(in srgb, var(--frame) 30%, transparent); }
 #world.animate .frame { transition: transform .4s ease, width .4s ease, height .4s ease; }
 .frame-ring {
@@ -128,23 +130,21 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 .frame-dot:hover { border-color: #fff; transform: scale(1.15); }
 .frame-grip { /* poignée de largeur : n'apparaît qu'au survol du coin bas-droit */
   position: absolute; right: calc(-1 * var(--edge)); bottom: calc(-1 * var(--edge));
-  width: calc(26px * var(--inv)); height: calc(26px * var(--inv));
-  display: flex; align-items: center; justify-content: center;
-  pointer-events: auto; cursor: nwse-resize; opacity: 0; transition: opacity .12s;
+  width: calc(30px * var(--inv)); height: calc(30px * var(--inv));
+  pointer-events: auto; cursor: nwse-resize; opacity: 0; transition: opacity .1s;
 }
-.frame-grip:hover { opacity: 1; }
-.frame-grip::after {
-  content: ""; width: calc(14px * var(--inv)); height: calc(14px * var(--inv)); border-radius: 50%;
-  background: hsl(from var(--frame) h calc(s + 35) calc(l + 16)); box-shadow: 0 0 0 var(--thin) rgba(255, 255, 255, .85);
-}
+.frame-grip:hover, .frame.resizing .frame-grip { opacity: 1; }
+.frame-grip svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.frame-grip path { fill: none; stroke: var(--bright); stroke-width: 4; stroke-linecap: round; }
+body.resizing-frame, body.resizing-frame * { cursor: nwse-resize !important; }
 
 /* Palette de couleurs des cadres */
 #framePalette {
-  position: fixed; z-index: 30; display: grid; grid-template-columns: repeat(10, 22px); gap: 4px; padding: 8px;
+  position: fixed; z-index: 30; display: grid; grid-template-columns: repeat(6, 26px); gap: 5px; padding: 8px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
 }
 #framePalette[hidden] { display: none; }
-#framePalette button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; }
+#framePalette button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; }
 #framePalette button:hover, #framePalette button.current { outline: 2px solid #fff; outline-offset: 1px; }
 
 /* Sélection */
