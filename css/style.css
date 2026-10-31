@@ -114,14 +114,20 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 .frame-edge.left { top: 0; bottom: 0; left: calc(-1 * var(--edge)); width: var(--edge); }
 .frame-edge.right { top: 0; bottom: 0; right: calc(-1 * var(--edge)); width: var(--edge); }
 .frame-tab {
-  position: absolute; left: calc(-1 * var(--edge)); bottom: calc(100% + var(--edge) - 1px * var(--inv)); /* chevauche l'anneau : aucune coupure */
-  display: flex; align-items: center; gap: 8px; padding: 6px 14px 5px; border-radius: 12px 12px 0 0;
+  /* L'onglet descend sur l'anneau. Le navigateur cale les boîtes au pixel du canevas : à fort zoom, le recouvrement doit
+     valoir un pixel du canevas (--ov, exprimé à l'échelle de l'onglet), sinon une coupure apparaît. */
+  --ov: max(1px, calc(1px / var(--inv)));
+  position: absolute; left: calc(-1 * var(--edge)); bottom: calc(100% + var(--edge) - var(--ov) * var(--inv));
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px calc(5px + var(--ov)); border-radius: 12px 12px 0 0;
   background: var(--frame); color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap; user-select: none;
   pointer-events: auto; cursor: move; transform: scale(var(--inv)); transform-origin: bottom left;
-  box-shadow: 0 0 0 2px var(--line); clip-path: inset(-2px -12px 0 -2px); /* contour de sélection, sauf côté cadre */
+  box-shadow: 0 0 0 2px var(--line);
+  /* contour de sélection : on le coupe là où l'onglet recouvre l'anneau */
+  clip-path: polygon(-2px -2px, calc(100% + 12px) -2px, calc(100% + 12px) 100%, calc(100% + 2px) 100%,
+    calc(100% + 2px) calc(100% - var(--ov)), 100% calc(100% - var(--ov)), 100% 100%, -2px 100%);
 }
 .frame-tab::after { /* raccord arrondi entre l'onglet et le haut du cadre */
-  content: ""; position: absolute; left: 100%; bottom: 0; width: 10px; height: 11px;
+  content: ""; position: absolute; left: 100%; bottom: 0; width: 10px; height: calc(10px + var(--ov));
   background: radial-gradient(circle at 100% 0, transparent 8px, var(--line) 8px, var(--line) 10px, var(--frame) 10px);
 }
 .frame-tab span { display: block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }

@@ -22,7 +22,7 @@ L'ancienne extension « Vers Miro » peut rester installée à côté. Tu pourra
 | **Pinterest** | Icône ⬆ au survol d'une épingle de la grille, ou en haut à droite sur la page d'une épingle. Images en taille d'origine, vidéos en MP4. |
 | **YouTube** | Icône ⬆ en haut à droite sur la page d'une vidéo ou d'un Short. Dans RefBoard, ça devient une carte : double-clic pour la lire dans la planche. |
 | **N'importe quel site** | Clic droit sur une image ou une vidéo → **Envoyer vers RefBoard**. Clic droit sur la page → **Envoyer cette page vers RefBoard** (son image d'aperçu). |
-| **Liste de liens** | Clique sur l'icône de l'extension, colle un lien par ligne, puis **Envoyer vers RefBoard**. |
+| **Liste de liens** | Clic droit sur l'icône de l'extension → **Envoyer une liste de liens…**, colle un lien par ligne, puis **Envoyer vers RefBoard**. |
 | **Dans RefBoard** | Colle (Ctrl+V) le lien d'un post X, Instagram, Pinterest ou d'une vidéo YouTube : l'extension s'occupe du reste. |
 
 Si RefBoard n'est pas ouvert, l'extension l'ouvre en arrière-plan. Si une vidéo est impossible à récupérer (ou dépasse 45 Mo), RefBoard reçoit au moins sa vignette avec le lien.

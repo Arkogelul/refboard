@@ -15,10 +15,20 @@ chrome.runtime.onInstalled.addListener(() => {
       id: 'link', title: 'Envoyer ce post vers RefBoard', contexts: ['link'], targetUrlPatterns: POST_PATTERNS,
     });
     chrome.contextMenus.create({ id: 'page', title: 'Envoyer cette page vers RefBoard', contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'links', title: 'Envoyer une liste de liens…', contexts: ['action'] });
   });
 });
 
+// Clic sur l'icône de l'extension : on revient sur l'onglet RefBoard, ou on l'ouvre s'il n'y en a pas.
+chrome.action.onClicked.addListener(async () => {
+  const tab = await findRefBoardTab();
+  if (!tab) return chrome.tabs.create({ url: REFBOARD_URL });
+  await chrome.tabs.update(tab.id, { active: true });
+  await chrome.windows.update(tab.windowId, { focused: true });
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'links') return chrome.windows.create({ url: 'popup.html', type: 'popup', width: 370, height: 430 });
   try {
     let items;
     if (info.menuItemId === 'media' && !info.srcUrl.startsWith('blob:')) {
