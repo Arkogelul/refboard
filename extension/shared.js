@@ -3,7 +3,7 @@
 //   { url, kind: 'image' | 'video', name, source, thumb? }  ou  { kind: 'youtube', id, short, source }
 
 const X_POST_RE = /(?:x|twitter)\.com\/[^/?#]+\/status\/(\d+)/;
-const IG_POST_RE = /instagram\.com\/(?:[^/?#]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
+const IG_POST_RE = /instagram\.com\/(?:[^/?#]+\/)?(?:p|reel|reels|tv)\/(?!audio\/)([A-Za-z0-9_-]+)/; // pas les pages « son » (/reels/audio/…)
 const PIN_RE = /pinterest\.[a-z.]+\/pin\/(?:[^/?#]*--)?(\d+)/;
 const PIN_SHORT_RE = /^https?:\/\/pin\.it\//;
 const YT_RE = /(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/;

@@ -40,13 +40,23 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }];
     } else {
       // Vidéo en streaming (blob:), post d'un réseau social, ou page entière : on passe par le post.
-      items = await resolvePost(info.linkUrl || info.pageUrl);
+      items = await resolvePost(info.linkUrl || (await clickedPost(tab, info)) || info.pageUrl);
     }
     toast(tab, await sendToRefBoard(items, tab), true);
   } catch (e) {
     toast(tab, e.message, false);
   }
 });
+
+// Sur le fil Instagram, le post sous le clic droit (retenu par instagram.js), sauf si la page est déjà celle d'un post.
+async function clickedPost(tab, info) {
+  if (!tab || IG_POST_RE.test(info.pageUrl) || !/^https:\/\/www\.instagram\.com\//.test(info.pageUrl)) return null;
+  try {
+    return await chrome.tabs.sendMessage(tab.id, { type: 'clickedPost' }, { frameId: info.frameId || 0 });
+  } catch (e) {
+    return null;
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   (async () => {

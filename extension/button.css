@@ -33,9 +33,10 @@
   color: #262626;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
-.refboard-in-card { top: 12px; right: 56px; opacity: 0; }
+/* Instagram : sous la bande nom / « Suivre », que le fil pose par-dessus les reels */
+.refboard-in-card { top: 60px; right: 10px; opacity: 0; }
 [data-grid-item] > .refboard-in-card { top: 8px; left: 8px; right: auto; }
-article:hover > .refboard-in-card,
+article:hover .refboard-in-card,
 [data-grid-item]:hover > .refboard-in-card,
 .refboard-in-card.busy,
 .refboard-in-card.done,
