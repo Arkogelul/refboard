@@ -20,6 +20,7 @@ $('send').addEventListener('click', async () => {
   $('status').textContent = 'Envoi en cours…';
   const res = await chrome.runtime.sendMessage({ type: 'sendPosts', urls });
   $('status').className = res.ok ? '' : 'err';
-  $('status').textContent = res.ok ? `✓ ${res.result}` : res.error;
+  $('status').textContent = res.ok ? res.result : res.error;
+  if (res.ok) $('status').insertAdjacentHTML('afterbegin', '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg>');
   $('send').disabled = false;
 });

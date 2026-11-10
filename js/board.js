@@ -160,6 +160,14 @@ const Board = (() => {
   // ---------- Éléments ----------
 
   const BADGES = { gif: 'GIF', video: 'VIDÉO', youtube: 'YOUTUBE' };
+  // Icônes du jeu commun (_Commun/icones_ui), en SVG inline.
+  const ICONES = {
+    muet: '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>',
+    son: '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+    lecture: '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4.5v15a.5.5 0 0 0 .8.4l11-7.5a.5.5 0 0 0 0-.8l-11-7.5a.5.5 0 0 0-.8.4Z" fill="currentColor"/></svg>',
+    stop: '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>',
+    source: '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  };
 
   function makeEl(it) {
     if (it.ids) return makeFrameEl(it);
@@ -169,9 +177,9 @@ const Board = (() => {
     el.dataset.type = it.type;
     el.innerHTML =
       '<div class="tools">' +
-      (it.type === 'video' ? '<button data-act="sound" title="Activer / couper le son">🔇</button>' : '') +
-      (it.type === 'youtube' ? '<button data-act="play" title="Lire / arrêter la vidéo">▶</button>' : '') +
-      '<button data-act="source" title="Ouvrir la source">↗</button>' +
+      (it.type === 'video' ? '<button data-act="sound" title="Activer / couper le son">' + ICONES.muet + '</button>' : '') +
+      (it.type === 'youtube' ? '<button data-act="play" title="Lire / arrêter la vidéo">' + ICONES.lecture + '</button>' : '') +
+      '<button data-act="source" title="Ouvrir la source">' + ICONES.source + '</button>' +
       '</div>' +
       (it.type === 'image' ? '' : `<div class="badge"><span>${BADGES[it.type]}</span></div>`);
     placeEl(el, it);
@@ -329,7 +337,7 @@ const Board = (() => {
     else el.prepend(node);
     el.classList.toggle('playing', level === 'player');
     const btn = el.querySelector('[data-act="play"]');
-    if (btn) btn.textContent = level === 'player' ? '■' : '▶';
+    if (btn) btn.innerHTML = level === 'player' ? ICONES.stop : ICONES.lecture;
   }
 
   function play(id) {
@@ -757,7 +765,7 @@ const Board = (() => {
       else audible.add(id);
       const video = els.get(id).querySelector('video');
       if (video) video.muted = !audible.has(id);
-      btn.textContent = audible.has(id) ? '🔊' : '🔇';
+      btn.innerHTML = audible.has(id) ? ICONES.son : ICONES.muet;
     }
     if (btn.dataset.act === 'play') (playing.has(id) ? stop : play)(id);
   });

@@ -187,8 +187,9 @@ function showToast(message, ok) {
   t.textContent = message;
   t.style.cssText =
     'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:2147483647;' +
-    'padding:10px 16px;border-radius:10px;font:600 14px system-ui,sans-serif;color:#fff;max-width:80vw;' +
-    `box-shadow:0 4px 16px rgba(0,0,0,.25);background:${ok ? '#4c6ef5' : '#d93025'}`;
+    'padding:10px 16px;border-radius:6px;font:600 14px "Segoe UI",system-ui,sans-serif;color:#e0e0e0;max-width:80vw;' +
+    'background:#2b2b2b;border:1px solid #444;box-shadow:0 4px 16px rgba(0,0,0,.35);' +
+    `border-left:4px solid ${ok ? '#3794ff' : '#ff5252'}`;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 4000);
 }
@@ -196,9 +197,10 @@ function showToast(message, ok) {
 // Identifiant de cette copie du script : après une mise à jour, la nouvelle copie remplace les icônes de l'ancienne.
 const REFBOARD_INSTANCE = Math.random().toString(36).slice(2);
 
+// Icône « exporter » du jeu commun (_Commun/icones_ui).
 const SEND_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-  '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 16V8M8.5 11.5 12 8l3.5 3.5"/></svg>';
+  '<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>';
 
 // Bouton « envoyer vers RefBoard ». run() renvoie { ok, result | error } ;
 // l'icône clignote pendant l'envoi puis devient verte (ou rouge) un instant.

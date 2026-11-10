@@ -1,4 +1,6 @@
-/* Icône discrète : grise comme les icônes d'action, bleu RefBoard au survol. */
+/* Icône discrète : grise comme les icônes d'action du site, accent MY APPS (#3794ff) au survol.
+   Injecté dans X, Instagram, Pinterest, YouTube : pas de theme.css ici (il restylerait le site),
+   les valeurs du thème (_Commun/theme.css) sont recopiées en dur. */
 .refboard-btn {
   display: inline-flex;
   align-items: center;
@@ -15,11 +17,11 @@
   transition: color 0.15s, background 0.15s, opacity 0.15s;
 }
 .refboard-btn svg { width: 18px; height: 18px; }
-.refboard-btn:hover { color: #4c6ef5; background: rgba(76, 110, 245, 0.1); }
-.refboard-btn.busy { color: #4c6ef5; cursor: wait; }
+.refboard-btn:hover { color: #3794ff; background: rgba(55, 148, 255, 0.12); }
+.refboard-btn.busy { color: #3794ff; cursor: wait; }
 .refboard-btn.busy svg { animation: refboard-pulse 0.9s ease-in-out infinite; }
-.refboard-btn.done { color: #00ba7c; }
-.refboard-btn.failed { color: #d93025; }
+.refboard-btn.done { color: #66bb6a; }
+.refboard-btn.failed { color: #ff5252; }
 @keyframes refboard-pulse { 50% { opacity: 0.3; } }
 
 /* Instagram, Pinterest : icône posée sur la carte, invisible tant que la souris n'est pas dessus. */
@@ -29,9 +31,10 @@
   z-index: 10;
   width: 30px;
   height: 30px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #262626;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: rgba(43, 43, 43, 0.92);
+  color: #e0e0e0;
+  border: 1px solid #444;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 /* Instagram : sous la bande nom / « Suivre », que le fil pose par-dessus les reels */
 .refboard-in-card { top: 60px; right: 10px; opacity: 0; }
@@ -43,6 +46,6 @@ article:hover .refboard-in-card,
 .refboard-in-card.failed { opacity: 1; }
 .refboard-page { position: fixed; top: 14px; right: 14px; z-index: 2147483646; opacity: 0.6; }
 .refboard-page:hover, .refboard-page.busy { opacity: 1; }
-.refboard-in-card:hover, .refboard-page:hover { background: #fff; color: #4c6ef5; }
+.refboard-in-card:hover, .refboard-page:hover { background: #2b2b2b; border-color: #3794ff; color: #3794ff; }
 /* YouTube : sous la barre du haut */
 ytd-app ~ #refboard-page-btn { top: 70px; }

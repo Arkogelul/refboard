@@ -2,18 +2,22 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="theme.css">
   <style>
-    body { width: 320px; margin: 0; padding: 14px; font: 13px system-ui, sans-serif; color: #e6e6e9; background: #18181b; }
+    body { width: 320px; margin: 0; padding: 14px; font: 13px var(--police); background: var(--fond-app); }
     h1 { font-size: 15px; margin: 0 0 8px; }
-    #board { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; background: #232845; }
-    #board.none { background: #3a2a1a; }
-    textarea { width: 100%; box-sizing: border-box; height: 90px; font: 12px monospace; color: inherit; background: #232328; border: 1px solid #2f2f36; border-radius: 6px; }
-    button { width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 6px; background: #4c6ef5; color: #fff; font-weight: 700; cursor: pointer; }
+    #board { margin: 0 0 10px; padding: 6px 8px; border-radius: var(--rayon); background: var(--fond-carte); border-left: 4px solid var(--accent); }
+    #board.none { border-left-color: var(--attention); }
+    textarea { width: 100%; box-sizing: border-box; height: 90px; font: 12px monospace; padding: 4px 6px; }
+    button { width: 100%; margin-top: 8px; padding: 8px; border-color: var(--accent); color: var(--accent); font-weight: 700; }
+    button:hover:not(:disabled) { background: var(--ligne-alternee); }
     button:disabled { opacity: .6; }
     label { display: block; margin-top: 10px; }
     #status { margin-top: 8px; min-height: 1em; }
-    .err { color: #ef5b5f; }
-    .hint { color: #8d8d96; font-size: 12px; margin-top: 10px; line-height: 1.5; }
+    #status .icone { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; color: var(--succes); }
+    .hint .icone { width: 14px; height: 14px; vertical-align: -2px; }
+    .err { color: var(--critique); }
+    .hint { color: var(--texte-secondaire); font-size: 12px; margin-top: 10px; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -23,7 +27,7 @@
   <button id="send">Envoyer vers RefBoard</button>
   <div id="status"></div>
   <label><input type="checkbox" id="focus"> Basculer sur RefBoard après l'envoi</label>
-  <p class="hint">Sur X, Instagram, Pinterest et YouTube : clique sur la petite icône ⬆ ajoutée aux posts.
+  <p class="hint">Sur X, Instagram, Pinterest et YouTube : clique sur la petite icône <svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg> ajoutée aux posts.
     Partout ailleurs : clic droit sur une image, une vidéo ou un lien → « Envoyer vers RefBoard ».</p>
   <script src="popup.js"></script>
 </body>

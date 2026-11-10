@@ -4,16 +4,18 @@
   <meta charset="utf-8">
   <title>RefBoard · import Miro</title>
   <script src="https://miro.com/app/static/sdk/v2/miro.js"></script>
+  <link rel="stylesheet" href="css/theme.css?v=12">
   <style>
-    body { margin: 0; padding: 16px; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #050038; }
+    body { margin: 0; padding: 16px; font: 14px/1.5 var(--police); }
     h1 { font-size: 16px; margin: 0 0 8px; }
     p { margin: 8px 0; }
     label { display: block; margin: 8px 0; }
-    button { width: 100%; margin-top: 10px; padding: 10px; border: 0; border-radius: 6px; background: #4c6ef5; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--accent); border-radius: var(--rayon); background: var(--fond-carte); color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+    button:hover:not(:disabled) { background: var(--ligne-alternee); }
     button:disabled { opacity: .5; cursor: default; }
     progress { width: 100%; margin-top: 12px; }
-    #log { margin-top: 10px; font-size: 12px; color: #555; white-space: pre-line; max-height: 240px; overflow: auto; }
-    .err { color: #d93025; }
+    #log { margin-top: 10px; font-size: 12px; color: var(--texte-secondaire); white-space: pre-line; max-height: 240px; overflow: auto; }
+    .err { color: var(--critique); }
   </style>
 </head>
 <body>

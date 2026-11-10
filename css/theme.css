@@ -1,0 +1,116 @@
+/*
+ * theme.css — identité visuelle commune des apps web de MY APPS (thème sombre).
+ *
+ * SOURCE UNIQUE : _Commun\theme.css. Les apps web (RefBoard, X Bookmarks, Bridge, Photo Album…)
+ * en ont une COPIE IDENTIQUE à côté de leur propre CSS, chargée AVANT lui.
+ * Ne pas modifier la copie sur place : modifier ici, puis recopier.
+ *
+ * Mêmes valeurs que _Commun\theme.py (référence : Tracker). Une couleur = un sens partout.
+ * Icônes : SVG inline du jeu commun (_Commun\icones_ui\*.svg, 24 × 24, trait 2, currentColor)
+ * dans un élément de classe « icone ».
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Fonds */
+  --fond-app: #232323;
+  --fond-panneau: #1e1e1e;
+  --fond-carte: #2b2b2b;
+  --ligne-alternee: #323232;
+  --survol: #555555;            /* poignée de barre de défilement survolée */
+
+  /* Bordures */
+  --bordure: #444444;
+  --bordure-douce: #3a3a3a;
+
+  /* Accent */
+  --accent: #3794ff;
+  --accent-doux: #5b9bd5;       /* titres de section */
+  --sur-accent: #ffffff;        /* texte posé sur l'accent */
+
+  /* Textes */
+  --texte: #e0e0e0;
+  --texte-secondaire: #8a8a8a;
+  --texte-discret: #7a7a7a;
+
+  /* Couleurs sémantiques */
+  --critique: #ff5252;          /* erreur, suppression */
+  --attention: #ff9800;
+  --intermediaire: #ffd54f;
+  --succes: #66bb6a;
+  --categorie-a: #ba68c8;
+  --categorie-b: #ffb74d;
+
+  /* Formes */
+  --rayon: 4px;                 /* boutons, champs */
+  --rayon-carte: 6px;           /* cartes, panneaux */
+  --rayon-petit: 3px;           /* pastilles, éléments de liste */
+
+  /* Police */
+  --police: "Segoe UI", "Noto Sans", system-ui, -apple-system, Roboto, sans-serif;
+  --taille-texte: 14px;         /* 11 pt Qt ≈ 14 px à l'écran */
+}
+
+/* ---------- Base ---------- */
+html { background: var(--fond-app); }
+body {
+  margin: 0;
+  background: var(--fond-app);
+  color: var(--texte);
+  font-family: var(--police);
+  font-size: var(--taille-texte);
+}
+::selection { background: var(--accent); color: var(--sur-accent); }
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-doux); }
+
+/* ---------- Boutons ---------- */
+button {
+  font: inherit;
+  color: var(--texte);
+  background: var(--fond-carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:active { background: var(--ligne-alternee); }
+button:disabled { color: var(--texte-discret); border-color: var(--bordure-douce); cursor: default; }
+
+/* ---------- Champs ---------- */
+input, select, textarea {
+  font: inherit;
+  color: var(--texte);
+  background: var(--fond-carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+}
+input::placeholder, textarea::placeholder { color: var(--texte-discret); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
+input[type="checkbox"], input[type="radio"], input[type="range"], progress { accent-color: var(--accent); }
+
+/* Focus clavier toujours visible, à l'accent */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Barres de défilement ---------- */
+html { scrollbar-color: var(--bordure) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bordure); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--survol); }
+
+/* ---------- Icônes (SVG inline du jeu commun) ---------- */
+.icone {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

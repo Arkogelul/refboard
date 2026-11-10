@@ -7,16 +7,17 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <meta name="theme-color" content="#18181b">
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <meta name="theme-color" content="#1e1e1e">
+  <link rel="stylesheet" href="css/theme.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
   <header id="toolbar">
     <img class="logo-icon" src="assets/icon.svg" alt="">
     <span class="logo">RefBoard</span>
     <select id="boardSelect" title="Changer de planche"></select>
-    <button id="boardNew" class="icon" title="Nouvelle planche">＋</button>
-    <button id="boardMenuBtn" class="icon" title="Renommer ou supprimer la planche">⋯</button>
+    <button id="boardNew" class="icon" title="Nouvelle planche" aria-label="Nouvelle planche"><svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button id="boardMenuBtn" class="icon" title="Renommer ou supprimer la planche" aria-label="Renommer ou supprimer la planche"><svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></button>
     <div id="tools">
     <button id="boardNew2" class="phone-only">Nouvelle planche</button>
     <button id="boardMenuBtn2" class="phone-only">Renommer ou supprimer la planche…</button>
@@ -28,12 +29,12 @@
     <button id="arrangeBtn" class="primary">Tout ranger</button>
     <button id="uniformBtn">Taille uniforme</button>
     <button id="frameBtn" title="Regrouper dans un cadre (Ctrl+G)">Nouveau cadre</button>
-    <button id="settingsBtn" class="icon" title="Réglages du rangement">⚙</button>
+    <button id="settingsBtn" class="icon" title="Réglages du rangement" aria-label="Réglages du rangement"><svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
     </div>
     <span class="grow"></span>
     <span id="status"></span>
     <button id="driveBtn" data-state="off">Se connecter à Drive</button>
-    <button id="toolsBtn" class="icon" title="Outils">☰</button>
+    <button id="toolsBtn" class="icon" title="Outils" aria-label="Outils"><svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   </header>
 
   <main id="stage">
@@ -113,13 +114,13 @@
   <div id="toast"></div>
 
   <script src="https://accounts.google.com/gsi/client" async></script>
-  <script src="js/config.js?v=11"></script>
-  <script src="js/db.js?v=11"></script>
-  <script src="js/layout.js?v=11"></script>
-  <script src="js/media.js?v=11"></script>
-  <script src="js/drive.js?v=11"></script>
-  <script src="js/board.js?v=11"></script>
-  <script src="js/sync.js?v=11"></script>
-  <script src="js/app.js?v=11"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/db.js?v=12"></script>
+  <script src="js/layout.js?v=12"></script>
+  <script src="js/media.js?v=12"></script>
+  <script src="js/drive.js?v=12"></script>
+  <script src="js/board.js?v=12"></script>
+  <script src="js/sync.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

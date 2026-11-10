@@ -23,13 +23,16 @@ const Sync = (() => {
 
   // ---------- État et bouton ----------
 
+  const COCHE = '<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg>'; // jeu commun (_Commun/icones_ui)
+
   function setState(s, text = '') {
     state = s;
     detail = text;
     const b = $('driveBtn');
     b.dataset.state = s;
     b.textContent =
-      { off: 'Se connecter à Drive', connecting: 'Connexion…', on: detail || 'Drive ✓', auth: 'Reconnecter Drive', error: 'Drive : erreur' }[s];
+      { off: 'Se connecter à Drive', connecting: 'Connexion…', on: detail || 'Drive', auth: 'Reconnecter Drive', error: 'Drive : erreur' }[s];
+    if (s === 'on' && !detail) b.insertAdjacentHTML('beforeend', ' ' + COCHE);
     b.title =
       {
         off: 'Enregistrer les planches et les médias sur ton Google Drive',
