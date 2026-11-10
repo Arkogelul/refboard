@@ -223,3 +223,34 @@ body.resizing-frame, body.resizing-frame * { cursor: nwse-resize !important; }
 }
 #toast.show { opacity: 1; }
 #toast.error { background: #4a1d20; border-color: #7a2c31; }
+
+/* Écrans tactiles : pas de survol, les boutons d'un média apparaissent quand il est sélectionné */
+#tools { display: contents; }
+#toolsBtn, .touch-hint, .phone-only { display: none; }
+@media (hover: none) {
+  .item.selected .tools { opacity: 1; }
+  .touch-hint { display: block; }
+  .mouse-hint { display: none; }
+}
+
+/* Téléphone : les outils passent dans le menu ☰, la planche et Drive restent dans la barre */
+@media (max-width: 760px) {
+  #toolbar { gap: 6px; padding: 0 8px; }
+  .logo, #status, #boardNew, #boardMenuBtn { display: none; }
+  #tools .phone-only { display: block; }
+  #boardSelect { flex: 1; min-width: 0; max-width: none; }
+  #toolbar .grow { display: none; }
+  #toolsBtn { display: inline-block; }
+  #tools {
+    display: none; position: fixed; top: 48px; right: 8px; z-index: 20; min-width: 220px; padding: 6px;
+    flex-direction: column; gap: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  }
+  body.tools-open #tools { display: flex; }
+  #tools .sep { display: none; }
+  #tools button { text-align: left; padding: 9px 12px; }
+  #settingsBtn::after { content: " Réglages du rangement"; }
+  .panel { width: auto; left: 8px !important; right: 8px; max-height: calc(100% - 60px); overflow: auto; }
+  #info { display: none; }
+}

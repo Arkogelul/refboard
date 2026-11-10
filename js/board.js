@@ -720,6 +720,7 @@ const Board = (() => {
   stage.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault()); // pas de défilement auto au clic molette
 
   stage.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return; // doigts : voir « Tactile » plus bas
     if (!board || e.target.closest('.tools button, .frame-tab input, .frame-dot')) return;
     endRename?.();
     if (e.button === 1 || (e.button === 0 && spaceDown)) return startPan(e);
@@ -762,19 +763,79 @@ const Board = (() => {
   });
 
   // Double-clic sur un média : il remplit l'écran.
-  stage.addEventListener('dblclick', (e) => {
-    const frameEl = e.target.closest('.frame');
+  function openTarget(target) {
+    const frameEl = target.closest('.frame');
     if (frameEl) {
-      if (e.target.closest('.frame-tab')) renameFrame(frameEl.dataset.id);
+      if (target.closest('.frame-tab')) renameFrame(frameEl.dataset.id);
       else zoomToRect(frameById(frameEl.dataset.id)); // double-clic sur le bord : le cadre remplit l'écran
       return;
     }
-    const el = e.target.closest('.item');
-    if (!el || e.target.closest('.tools')) return;
+    const el = target.closest('.item');
+    if (!el || target.closest('.tools')) return;
     const it = byId(el.dataset.id);
     zoomToRect(it, 30, MAX_ZOOM);
     if (it.type === 'youtube') play(it.id);
+  }
+  let touchOpenAt = 0;
+  stage.addEventListener('dblclick', (e) => performance.now() - touchOpenAt > 700 && openTarget(e.target));
+
+  // ---------- Tactile ----------
+  // Un doigt déplace la vue, deux doigts zooment. Un toucher sélectionne, deux touchers rapides font remplir l'écran.
+  // Rien ne bouge sous le doigt : sur téléphone on consulte, on ne range pas.
+  const touches = new Map();
+  let pinch = null;
+  let tap = null;
+  let lastTap = { t: 0, target: null };
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || !board || e.target.closest('.tools button, .frame-tab input, .frame-dot')) return;
+    endRename?.();
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    tap = touches.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now(), target: e.target } : null;
+    pinch = null;
   });
+
+  addEventListener('pointermove', (e) => {
+    const prev = touches.get(e.pointerId);
+    if (!prev) return;
+    const now = { x: e.clientX, y: e.clientY };
+    touches.set(e.pointerId, now);
+    if (tap && Math.hypot(now.x - tap.x, now.y - tap.y) > 10) tap = null;
+    if (touches.size === 1) {
+      view.x += now.x - prev.x;
+      view.y += now.y - prev.y;
+      return applyView();
+    }
+    const [a, b] = touches.values();
+    const r = stage.getBoundingClientRect();
+    const mid = { x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top };
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinch) {
+      view.x += mid.x - pinch.mid.x;
+      view.y += mid.y - pinch.mid.y;
+      zoomAt(dist / pinch.dist, mid.x, mid.y);
+    }
+    pinch = { mid, dist };
+  });
+
+  function touchEnd(e) {
+    if (!touches.delete(e.pointerId)) return;
+    pinch = null;
+    const t = tap;
+    tap = null;
+    if (!t || e.type === 'pointercancel' || touches.size || performance.now() - t.t > 400) return;
+    const el = t.target.closest('.item, .frame');
+    const now = performance.now();
+    if (el && lastTap.target?.closest('.item, .frame') === el && now - lastTap.t < 400) {
+      lastTap = { t: 0, target: null };
+      touchOpenAt = now;
+      return openTarget(t.target);
+    }
+    lastTap = { t: now, target: t.target };
+    setSelection(el ? [el.dataset.id] : []);
+  }
+  addEventListener('pointerup', touchEnd);
+  addEventListener('pointercancel', touchEnd);
 
   // Espace maintenu : déplacement de la vue à la souris.
   const typing = () => document.activeElement?.matches('input, textarea, select');

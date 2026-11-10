@@ -327,13 +327,14 @@ async function receive(list, fromMiro) {
 
 $('boardSelect').onchange = (e) => openBoard(e.target.value);
 $('boardNew').onclick = createBoard;
-$('boardMenuBtn').onclick = (e) => {
+$('boardMenuBtn').onclick = $('boardMenuBtn2').onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   openMenu(r.left, r.bottom + 4, [
     { label: 'Renommer la planche…', run: renameBoard },
     { label: 'Supprimer la planche…', run: deleteBoard, danger: true },
   ]);
 };
+$('boardNew2').onclick = createBoard;
 
 $('driveBtn').onclick = (e) => Sync.menu(e.currentTarget);
 $('arrangeBtn').onclick = () => Board.arrange(settings);
@@ -361,6 +362,12 @@ $('settingsBtn').onclick = (e) => {
 $('panelArrange').onclick = () => Board.arrange(settings);
 $('panelUniform').onclick = () => Board.uniform(settings.uniformDim, +settings.uniformSize);
 
+// Téléphone : le menu ☰ regroupe les outils ; il se ferme après un choix.
+$('toolsBtn').onclick = () => document.body.classList.toggle('tools-open');
+$('tools').addEventListener('click', (e) => {
+  if (e.target.closest('button') && !e.target.closest('#settingsBtn')) document.body.classList.remove('tools-open');
+});
+
 $('zoomIn').onclick = () => Board.zoomBy(1.25);
 $('zoomOut').onclick = () => Board.zoomBy(0.8);
 $('zoomLabel').onclick = () => Board.zoomReset();
@@ -370,6 +377,7 @@ $('zoomFit').onclick = () => Board.fitAll();
 addEventListener('pointerdown', (e) => {
   if (!e.target.closest('#menu')) closeMenu();
   if (!e.target.closest('#settingsPanel, #settingsBtn')) panel.hidden = true;
+  if (!e.target.closest('#tools, #toolsBtn, #settingsPanel')) document.body.classList.remove('tools-open');
 });
 
 // ---------- Menus ----------
