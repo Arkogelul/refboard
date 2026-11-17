@@ -197,10 +197,13 @@ function showToast(message, ok) {
 // Identifiant de cette copie du script : après une mise à jour, la nouvelle copie remplace les icônes de l'ancienne.
 const REFBOARD_INSTANCE = Math.random().toString(36).slice(2);
 
-// Icône « exporter » du jeu commun (_Commun/icones_ui).
+// Logo de RefBoard (formes de _Commun/icones_apps/RefBoard.svg, sans le carré de fond).
 const SEND_ICON =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-  '<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>';
+  '<svg viewBox="16 16 224 224" aria-hidden="true"><g transform="translate(-15.4 -15.4) scale(1.12)">' +
+  '<rect x="28" y="28" width="116" height="104" rx="18" fill="#2a78e4"/>' +
+  '<rect x="158" y="28" width="70" height="150" rx="18" fill="#f8b4cd"/>' +
+  '<rect x="28" y="146" width="116" height="82" rx="18" fill="#474c54"/>' +
+  '<rect x="158" y="192" width="70" height="36" rx="14" fill="#2a78e4"/></g></svg>';
 
 // Bouton « envoyer vers RefBoard ». run() renvoie { ok, result | error } ;
 // l'icône clignote pendant l'envoi puis devient verte (ou rouge) un instant.

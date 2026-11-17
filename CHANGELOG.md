@@ -3,6 +3,12 @@
 Format : une section par version, la plus recente en haut.
 Version = celle de l extension (extension/manifest.json) ; le site suit le depot (git log).
 
+## 2.4.1 — 2026-11-17
+
+- Icônes harmonisées sur l'icône officielle (`_Commun\icones_apps\RefBoard.svg`) : barre d'outils
+  et fiche de l'extension (l'ancien dossier bleu disparaît), bouton posé sur les posts et popup.
+- Le bouton des posts garde les couleurs du logo ; envoi, réussite et échec se lisent sur son fond.
+
 ## En cours (non publie)
 
 - `build.bat` : publie le site (push de main, servi par GitHub Pages), apres confirmation ;

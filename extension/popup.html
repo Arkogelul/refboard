@@ -5,7 +5,8 @@
   <link rel="stylesheet" href="theme.css">
   <style>
     body { width: 320px; margin: 0; padding: 14px; font: 13px var(--police); background: var(--fond-app); }
-    h1 { font-size: 15px; margin: 0 0 8px; }
+    h1 { font-size: 15px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+    h1 img { width: 20px; height: 20px; }
     #board { margin: 0 0 10px; padding: 6px 8px; border-radius: var(--rayon); background: var(--fond-carte); border-left: 4px solid var(--accent); }
     #board.none { border-left-color: var(--attention); }
     textarea { width: 100%; box-sizing: border-box; height: 90px; font: 12px monospace; padding: 4px 6px; }
@@ -21,13 +22,13 @@
   </style>
 </head>
 <body>
-  <h1>Vers RefBoard</h1>
+  <h1><img src="icons/icon-32.png" alt="">Vers RefBoard</h1>
   <div id="board">…</div>
   <textarea id="urls" placeholder="Colle un ou plusieurs liens (un par ligne) : posts X, Instagram, Pinterest, vidéos YouTube, ou n'importe quelle page"></textarea>
   <button id="send">Envoyer vers RefBoard</button>
   <div id="status"></div>
   <label><input type="checkbox" id="focus"> Basculer sur RefBoard après l'envoi</label>
-  <p class="hint">Sur X, Instagram, Pinterest et YouTube : clique sur la petite icône <svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg> ajoutée aux posts.
+  <p class="hint">Sur X, Instagram, Pinterest et YouTube : clique sur le petit logo <img class="icone" src="icons/icon-16.png" alt=""> ajouté aux posts.
     Partout ailleurs : clic droit sur une image, une vidéo ou un lien → « Envoyer vers RefBoard ».</p>
   <script src="popup.js"></script>
 </body>
