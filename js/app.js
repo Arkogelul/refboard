@@ -544,6 +544,10 @@ addEventListener('keydown', (e) => {
   else if (ctrl && (e.code === 'Digit0' || e.code === 'Numpad0')) Board.zoomReset();
   else if (e.shiftKey && e.code === 'Digit1') Board.fitAll();
   else if (e.shiftKey && e.code === 'Digit2') Board.fitSelection();
+  // Vidéo sélectionnée : image par image, ou 10 images avec Maj.
+  else if (!ctrl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    done = Board.stepVideo((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+  }
   else done = false;
   if (done) e.preventDefault();
 });

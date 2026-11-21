@@ -32,6 +32,8 @@ const Board = (() => {
   const selected = new Set();
   const audible = new Set(); // vidéos dont le son a été activé
   const playing = new Set(); // cartes YouTube dont le lecteur est lancé
+  const paused = new Map(); // id -> instant (s) des vidéos mises en pause à la main : la pause survit au rechargement du média
+  const fpsOf = new Map(); // id -> cadence mesurée pendant la lecture (le navigateur ne la donne pas)
   const undoStack = [];
   const redoStack = [];
   let board = null;
@@ -181,7 +183,8 @@ const Board = (() => {
       (it.type === 'youtube' ? '<button data-act="play" title="Lire / arrêter la vidéo">' + ICONES.lecture + '</button>' : '') +
       '<button data-act="source" title="Ouvrir la source">' + ICONES.source + '</button>' +
       '</div>' +
-      (it.type === 'image' ? '' : `<div class="badge"><span>${BADGES[it.type]}</span></div>`);
+      (it.type === 'image' ? '' : `<div class="badge"><span>${BADGES[it.type]}</span></div>`) +
+      (it.type === 'video' ? '<div class="ligne"><i></i></div>' : '');
     placeEl(el, it);
     return el;
   }
@@ -293,11 +296,14 @@ const Board = (() => {
     let node;
     if (level === 'full' && it.type === 'video') {
       node = document.createElement('video');
-      Object.assign(node, { muted: !audible.has(it.id), loop: true, autoplay: true, playsInline: true, src: url });
+      const held = paused.get(it.id);
+      Object.assign(node, { muted: !audible.has(it.id), loop: true, autoplay: held === undefined, playsInline: true, src: url });
       await new Promise((ok) => {
         node.onloadeddata = ok;
         node.onerror = ok;
       });
+      if (held !== undefined) node.currentTime = held; // une vidéo mise en pause le reste, à la même image
+      watchVideo(it.id, node);
     } else {
       node = new Image();
       node.draggable = false;
@@ -430,7 +436,7 @@ const Board = (() => {
     );
   }
 
-  function startMove(e, clickedId) {
+  function startMove(e, clickedId, onClick) {
     const start = toWorld(e.clientX, e.clientY);
     const moving = selFrames();
     const children = new Set(moving.flatMap((f) => f.ids));
@@ -463,10 +469,131 @@ const Board = (() => {
           const p = toWorld(ev.clientX, ev.clientY);
           dropItems(loose, moving.length ? null : frameAt(p), p);
           changed();
-        } else if (!e.shiftKey) setSelection([clickedId]); // simple clic dans une sélection : on ne garde que ce média
+        } else if (!e.shiftKey) {
+          setSelection([clickedId]); // simple clic dans une sélection : on ne garde que ce média
+          onClick?.();
+        }
       }
     );
   }
+
+  // ---------- Lecture des vidéos ----------
+  // Clic sur une vidéo : sélection et pause. Reclic : lecture / pause. Glisser dans la vidéo sélectionnée :
+  // droite avance, gauche recule. Flèches : image par image (Maj : 10 images). Une fine ligne montre où on en est.
+
+  const PX_PAR_IMAGE = 6;
+  const CADENCES = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
+  const fps = (id) => fpsOf.get(id) || 30;
+  const videoOf = (id) => els.get(id)?.querySelector('video.media');
+  const imageAt = (id, t) => Math.floor(t * fps(id) + 1e-3);
+
+  function watchVideo(id, v) {
+    v.addEventListener('pause', () => showVideoState(id));
+    v.addEventListener('play', () => showVideoState(id));
+    v.addEventListener('seeked', () => {
+      // Pendant un glisser, on ne lance une recherche qu'à la fin de la précédente : la vidéo suit sans prendre de retard.
+      if (v._want !== undefined && Math.abs(v.currentTime - v._want) > 1e-4) v.currentTime = v._want;
+      else v._want = undefined;
+      showVideoState(id);
+    });
+    showVideoState(id);
+    if (fpsOf.has(id) || !v.requestVideoFrameCallback) return;
+    // Cadence : le plus petit écart entre deux images affichées, ramené à la cadence courante la plus proche.
+    let last = null;
+    let best = Infinity;
+    let n = 0;
+    const sample = (now, meta) => {
+      if (last !== null && meta.mediaTime - last > 0.004) best = Math.min(best, meta.mediaTime - last);
+      last = meta.mediaTime;
+      if (++n < 40 && videoOf(id) === v) return v.requestVideoFrameCallback(sample);
+      if (best < Infinity) fpsOf.set(id, CADENCES.reduce((a, b) => (Math.abs(b - 1 / best) < Math.abs(a - 1 / best) ? b : a)));
+      showVideoState(id);
+    };
+    v.requestVideoFrameCallback(sample);
+  }
+
+  function showVideoState(id) {
+    const v = videoOf(id);
+    const span = els.get(id)?.querySelector('.badge span');
+    if (!v || !span) return;
+    span.textContent = v.paused ? `‖  IMG ${imageAt(id, v._want ?? v.currentTime) + 1}` : BADGES.video;
+  }
+
+  function seekTo(id, v, t) {
+    t = clamp(t, 0, Math.max(0, (v.duration || 0) - 0.001));
+    paused.set(id, t);
+    v._want = t;
+    if (!v.seeking) v.currentTime = t;
+    showVideoState(id);
+  }
+
+  // Se place au milieu de l'image visée : le navigateur affiche alors sûrement celle-là.
+  function seekFrame(id, v, f) {
+    const last = Math.max(0, Math.ceil((v.duration || 0) * fps(id)) - 1);
+    seekTo(id, v, (clamp(f, 0, last) + 0.5) / fps(id));
+  }
+
+  function pauseVideo(id) {
+    const v = videoOf(id);
+    if (!v) return;
+    v.pause();
+    paused.set(id, v.currentTime);
+  }
+
+  function resumeVideo(id) {
+    const v = videoOf(id);
+    if (!v) return;
+    paused.delete(id);
+    v.play().catch(() => {});
+  }
+
+  // Flèches : la vidéo seule sélectionnée avance ou recule de n images (et se met en pause).
+  function stepVideo(n) {
+    if (selected.size !== 1) return false;
+    const [id] = selected;
+    const v = videoOf(id);
+    if (!v) return false;
+    pauseVideo(id);
+    seekFrame(id, v, imageAt(id, v._want ?? v.currentTime) + n);
+    return true;
+  }
+
+  // Vidéo déjà sélectionnée : un clic met en pause ou relance, un glisser déplace la tête de lecture.
+  function startScrub(e, id) {
+    const v = videoOf(id);
+    const el = els.get(id);
+    const f0 = imageAt(id, v._want ?? v.currentTime);
+    let moved = false;
+    drag(
+      e,
+      (ev) => {
+        if (!moved && !movedEnough(e, ev)) return;
+        if (!moved) {
+          pauseVideo(id);
+          el.classList.add('scrubbing');
+          document.body.classList.add('scrubbing');
+        }
+        moved = true;
+        seekFrame(id, v, f0 + Math.round((ev.clientX - e.clientX) / PX_PAR_IMAGE));
+      },
+      () => {
+        el.classList.remove('scrubbing');
+        document.body.classList.remove('scrubbing');
+        if (moved) return;
+        if (v.paused) resumeVideo(id);
+        else pauseVideo(id);
+      }
+    );
+  }
+
+  // La ligne de lecture des vidéos survolées ou sélectionnées suit la tête de lecture à chaque image.
+  (function followLines() {
+    for (const el of world.querySelectorAll('.item[data-type="video"]:hover, .item[data-type="video"].selected')) {
+      const v = el.querySelector('video.media');
+      if (v?.duration) el.querySelector('.ligne i').style.transform = `scaleX(${(v._want ?? v.currentTime) / v.duration})`;
+    }
+    requestAnimationFrame(followLines);
+  })();
 
   // ---------- Cadres ----------
 
@@ -743,13 +870,15 @@ const Board = (() => {
     const el = e.target.closest('.item, .frame');
     if (!el) return startRubber(e);
     const id = el.dataset.id;
+    // Vidéo déjà seule sélectionnée et chargée : clic = lecture / pause, glisser = tête de lecture.
+    if (!e.shiftKey && selected.size === 1 && selected.has(id) && videoOf(id)) return startScrub(e, id);
     if (e.shiftKey && selected.has(id)) {
       selected.delete(id);
       return setSelection([...selected]);
     }
     if (e.shiftKey) setSelection([...selected, id]);
     else if (!selected.has(id)) setSelection([id]);
-    startMove(e, id);
+    startMove(e, id, () => videoOf(id) && pauseVideo(id)); // premier clic sur une vidéo : elle se met en pause
   });
 
   stage.addEventListener('pointermove', (e) => (pointer = { x: e.clientX, y: e.clientY }));
@@ -1094,5 +1223,6 @@ const Board = (() => {
     fitAll: () => zoomToRect(bounds(allBlocks())),
     fitSelection: () => zoomToRect(bounds(selBlocks()) || bounds(allBlocks())),
     selectionSize: () => selected.size,
+    stepVideo,
   });
 })();

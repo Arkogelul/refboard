@@ -3,6 +3,16 @@
 Format : une section par version, la plus recente en haut.
 Version = celle de l extension (extension/manifest.json) ; le site suit le depot (git log).
 
+## Site — en cours (non publié)
+
+- Lecture des vidéos sur la planche : une fine ligne de lecture apparaît au survol (jamais cliquable).
+  Un clic sur une vidéo la sélectionne et la met en pause, un reclic relance ou remet en pause.
+  Glisser dans une vidéo déjà sélectionnée déplace la tête de lecture (droite avance, gauche recule) ;
+  glisser une vidéo non sélectionnée la déplace comme avant.
+- Flèches ← → : image par image sur la vidéo sélectionnée, Maj + flèches : 10 images.
+  La cadence est mesurée pendant la lecture (30 i/s en attendant). En pause, le badge affiche le numéro d'image.
+- Une vidéo mise en pause le reste, à la même image, quand elle est rechargée (zoom, défilement).
+
 ## 2.4.1 — 2026-11-17
 
 - Icônes harmonisées sur l'icône officielle (`_Commun\icones_apps\RefBoard.svg`) : barre d'outils

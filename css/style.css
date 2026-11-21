@@ -68,7 +68,13 @@ body.dragover #stage { outline: 2px dashed var(--accent); outline-offset: -8px; 
 .item .tools button:hover { background: var(--accent); }
 .item:not(.has-source) [data-act="source"] { display: none; }
 .item .badge { position: absolute; left: 0; bottom: 0; padding: 6px; transform: scale(var(--inv)); transform-origin: bottom left; pointer-events: none; }
-.item .badge span { display: block; padding: 1px 5px; border-radius: var(--rayon-petit); background: rgba(0, 0, 0, .6); color: #fff; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+.item .badge span { display: block; padding: 1px 5px; border-radius: var(--rayon-petit); background: rgba(0, 0, 0, .6); color: #fff; font-size: 10px; font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; white-space: pre; }
+/* Ligne de lecture des vidéos : toujours fine, jamais cliquable, au survol ou quand la vidéo est sélectionnée */
+.item .ligne { position: absolute; left: 0; right: 0; bottom: 0; height: calc(2px * var(--inv)); background: rgba(255, 255, 255, .18); pointer-events: none; opacity: 0; transition: opacity .12s; }
+.item .ligne i { position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+.item:has(video.media):hover .ligne, .item.selected:has(video.media) .ligne { opacity: 1; }
+.item.tiny .ligne { display: none; }
+body.scrubbing, body.scrubbing * { cursor: ew-resize !important; }
 .item.tiny .tools, .item.tiny .badge { display: none; }
 
 .item.dragging { z-index: 10; }
